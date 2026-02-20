@@ -113,10 +113,6 @@
       },
       {
         "Section": "Review and Approval",
-        "ChecklistItem": "Review comments and updates are documented."
-      },
-      {
-        "Section": "Review and Approval",
         "ChecklistItem": "Final version is approved and signed off."
       }
     ],
