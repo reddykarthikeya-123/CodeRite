@@ -97,20 +97,26 @@ class AIEngine:
             })
             
             # Programmatic Scoring Logic
-            total_items = len(response.get("checklist", []))
-            if total_items == 0:
+            # Programmatic Scoring Logic
+            valid_items = 0
+            score = 0
+            
+            for item in response.get("checklist", []):
+                status = str(item.get("status", "")).lower()
+                if "not applicable" in status or "n/a" in status:
+                    continue # Skip these entirely from the calculation
+                    
+                valid_items += 1
+                if "pass" in status:
+                    score += 1.0
+                elif "warning" in status:
+                    score += 0.5
+                # fail gets 0
+            
+            if valid_items == 0:
                 response["score"] = 0
             else:
-                score = 0
-                for item in response["checklist"]:
-                    status = str(item.get("status", "")).lower()
-                    if status == "pass":
-                        score += 1.0
-                    elif status == "warning":
-                        score += 0.5
-                    # fail gets 0
-                
-                final_score = int((score / total_items) * 100)
+                final_score = int((score / valid_items) * 100)
                 response["score"] = final_score
 
             return response
