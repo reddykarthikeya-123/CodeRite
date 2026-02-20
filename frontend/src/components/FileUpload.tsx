@@ -4,7 +4,7 @@ import { uploadFile, fetchChecklistCategories } from '../api';
 import { motion } from 'framer-motion';
 
 interface FileUploadProps {
-    onFileProcessed: (content: string, filename: string, category: string) => void;
+    onFileProcessed: (content: string, filename: string, category: string, images?: string[]) => void;
 }
 
 export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
@@ -29,7 +29,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
         setError(null);
         try {
             const data = await uploadFile(file);
-            onFileProcessed(data.content, data.filename, selectedCategory);
+            onFileProcessed(data.content, data.filename, selectedCategory, data.images);
         } catch (err: any) {
             setError(`Upload Failed: ${err.message || 'Unknown error. Please check backend logs.'}`);
             console.error(err);

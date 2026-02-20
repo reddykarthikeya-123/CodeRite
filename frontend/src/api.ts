@@ -61,7 +61,7 @@ export const deleteConnection = async (id: number): Promise<void> => {
   });
 };
 
-export const uploadFile = async (file: File): Promise<{ filename: string; content: string }> => {
+export const uploadFile = async (file: File): Promise<{ filename: string; content: string; images?: string[] }> => {
   const formData = new FormData();
   formData.append("file", file);
 
@@ -86,8 +86,8 @@ export const fetchChecklistCategories = async (): Promise<string[]> => {
   return data.categories || [];
 };
 
-export const analyzeDocument = async (text: string, customInstructions: string, documentCategory?: string): Promise<ReviewResponse> => {
-  const payload: any = { text, custom_instructions: customInstructions };
+export const analyzeDocument = async (text: string, customInstructions: string, documentCategory?: string, images?: string[]): Promise<ReviewResponse> => {
+  const payload: any = { text, custom_instructions: customInstructions, images: images || [] };
   if (documentCategory) payload.document_category = documentCategory;
 
   const response = await fetch(`${API_BASE_URL}/analyze`, {

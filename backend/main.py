@@ -38,6 +38,7 @@ class ConnectionCreate(BaseModel):
 
 class AnalysisRequest(BaseModel):
     text: str
+    images: Optional[List[str]] = []
     custom_instructions: Optional[str] = ""
     document_category: Optional[str] = None
 
@@ -135,8 +136,8 @@ async def delete_connection(conn_id: int, db: AsyncSession = Depends(get_db)):
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
-        content = await parse_file(file)
-        return {"filename": file.filename, "content": content}
+        parsed_data = await parse_file(file)
+        return {"filename": file.filename, "content": parsed_data["text"], "images": parsed_data.get("images", [])}
     except Exception as e:
         import traceback
         err_msg = traceback.format_exc()
@@ -158,7 +159,7 @@ async def analyze_document(request: AnalysisRequest, db: AsyncSession = Depends(
 
     try:
         engine = AIEngine(provider=provider, model_name=model_name, api_key=api_key)
-        review_result = await engine.analyze_document(request.text, request.custom_instructions, request.document_category)
+        review_result = await engine.analyze_document(request.text, request.images, request.custom_instructions, request.document_category)
         
         # Save result to DB (Optional for prototype)
         # review = DocumentReview(score=review_result.get("score", 0), full_response_json=review_result)

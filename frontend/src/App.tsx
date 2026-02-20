@@ -25,13 +25,13 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleFileProcessed = async (content: string, filename: string, category: string) => {
+  const handleFileProcessed = async (content: string, filename: string, category: string, images?: string[]) => {
     setCurrentFile({ content, filename });
     setReviewResult(null);
     setAnalyzing(true);
 
     try {
-      const result = await analyzeDocument(content, "", category);
+      const result = await analyzeDocument(content, "", category, images);
       setReviewResult(result);
     } catch (err) {
       console.error(err);

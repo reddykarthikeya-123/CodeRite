@@ -7,35 +7,39 @@ from PIL import Image
 import pytesseract
 from pdf2image import convert_from_bytes
 import os
+import base64
 
 # Configure Tesseract path for Windows
 tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 if os.path.exists(tesseract_path):
     pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
-async def parse_file(file: UploadFile) -> str:
+async def parse_file(file: UploadFile) -> dict:
     content = ""
+    images = []
     filename = file.filename.lower()
     
     try:
         if filename.endswith(".pdf"):
-            content = await _parse_pdf(file)
+            content, images = await _parse_pdf(file)
         elif filename.endswith(".docx"):
-            content = await _parse_docx(file)
+            content, images = await _parse_docx(file)
         elif filename.endswith((".txt", ".md", ".py", ".js", ".ts", ".json", ".html", ".css")):
             content = await _parse_text(file)
+            images = []
         elif filename.endswith((".xlsx", ".xls", ".csv")):
             content = await _parse_excel(file)
+            images = []
         else:
             raise HTTPException(status_code=400, detail="Unsupported file type")
             
-        return content
+        return {"text": content, "images": images}
     except Exception as e:
          import traceback
          err_trace = traceback.format_exc()
          raise HTTPException(status_code=500, detail=f"Error parsing file: {str(e)}\n\n{err_trace}")
 
-async def _parse_pdf(file: UploadFile) -> str:
+async def _parse_pdf(file: UploadFile) -> tuple[str, list]:
     content = await file.read()
     
     # Text extraction via pypdf
@@ -46,25 +50,35 @@ async def _parse_pdf(file: UploadFile) -> str:
         if extracted:
             text += extracted + "\n"
     
+    base64_images = []
+    
     # OCR fallback/enhancement via pdf2image and pytesseract
     try:
         # Poppler is required for pdf2image. If not in PATH, this will fail gracefully.
         images = convert_from_bytes(content)
         for i, img in enumerate(images):
+            # Base64 encode the image for Vision LLMs
+            buffered = io.BytesIO()
+            img.save(buffered, format="JPEG")
+            img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            base64_images.append(img_b64)
+            
             # Only run OCR if page text seems sparse (e.g., scanned doc) to save time,
             # or just run it to catch embedded images. We'll add it if pypdf barely found anything.
             if len(text.strip()) < 100 * len(images): 
                 ocr_text = pytesseract.image_to_string(img)
                 text += f"\n--- OCR Page {i+1} ---\n" + ocr_text + "\n"
     except Exception as e:
-        print(f"OCR warning on PDF: {e}")
+        print(f"OCR/Vision warning on PDF: {e}")
         
-    return text
+    return text, base64_images
 
-async def _parse_docx(file: UploadFile) -> str:
+async def _parse_docx(file: UploadFile) -> tuple[str, list]:
     content = await file.read()
     doc = Document(io.BytesIO(content))
     text = "\n".join([para.text for para in doc.paragraphs])
+    
+    base64_images = []
     
     # Basic attempt to extract inline images from Docx
     try:
@@ -72,13 +86,21 @@ async def _parse_docx(file: UploadFile) -> str:
             if "image" in rel.target_ref:
                 img_data = rel.target_part.blob
                 img = Image.open(io.BytesIO(img_data))
+                
+                # Base64 encode
+                buffered = io.BytesIO()
+                if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+                img.save(buffered, format="JPEG")
+                img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                base64_images.append(img_b64)
+                
                 ocr_text = pytesseract.image_to_string(img)
                 if ocr_text.strip():
                     text += f"\n--- Embedded Image OCR ---\n{ocr_text}\n"
     except Exception as e:
-        print(f"OCR warning on Docx: {e}")
+        print(f"OCR/Vision warning on Docx: {e}")
         
-    return text
+    return text, base64_images
 
 async def _parse_text(file: UploadFile) -> str:
     content = await file.read()

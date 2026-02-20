@@ -2,6 +2,7 @@ from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatOllama
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -53,7 +54,7 @@ class AIEngine:
             print(f"Connection test failed: {e}")
             raise Exception(f"{str(e)}")
 
-    async def analyze_document(self, text: str, custom_instructions: str = "", document_category: str = None) -> dict:
+    async def analyze_document(self, text: str, images: List[str] = None, custom_instructions: str = "", document_category: str = None) -> dict:
         from services.checklist_loader import loader
 
         target_checklist = []
@@ -81,20 +82,31 @@ class AIEngine:
         Ensure the tone is professional and constructive.
         {checklist_context}
         """
+        system_msg_content = system_prompt.format(checklist_context=checklist_context)
         
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("user", "Custom Instructions: {custom_instructions}\n\nDocument Content:\n{text}")
-        ])
+        # Check if the selected model supports vision (heuristic)
+        supports_vision = any(v in self.model_name.lower() for v in ["gpt-4o", "gemini-1.5", "llava", "vision"])
         
-        chain = prompt | self.llm | self.parser
+        # Build multimodal User message only if supported
+        if images and len(images) > 0 and supports_vision:
+            user_content = [{"type": "text", "text": f"Custom Instructions: {custom_instructions}\n\nDocument Content:\n{text}"}]
+            for img_b64 in images:
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
+                })
+        else:
+            user_content = f"Custom Instructions: {custom_instructions}\n\nDocument Content:\n{text}"
+            
+        messages = [
+            SystemMessage(content=system_msg_content),
+            HumanMessage(content=user_content)
+        ]
+        
+        chain = self.llm | self.parser
         
         try:
-            response = await chain.ainvoke({
-                "text": text, 
-                "custom_instructions": custom_instructions,
-                "checklist_context": checklist_context
-            })
+            response = await chain.ainvoke(messages)
             
             # Programmatic Scoring Logic
             # Programmatic Scoring Logic
