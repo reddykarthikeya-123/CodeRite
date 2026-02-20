@@ -15,7 +15,6 @@ class ChecklistItem(BaseModel):
     comment: str = Field(description="Comment explaining the status")
 
 class ReviewResponse(BaseModel):
-    score: int = Field(description="Overall quality score from 0 to 100")
     checklist: List[ChecklistItem] = Field(description="List of checklist items reviewed")
     suggestions: List[str] = Field(description="List of specific suggestions for improvement")
     rewritten_content: Optional[str] = Field(description="Optional rewritten content if applicable")
@@ -66,9 +65,12 @@ class AIEngine:
         system_prompt = """You are an expert document auditor and reviewer. 
         Your task is to review the provided document against standard best practices, any custom instructions, and strictly against the Target Checklist provided.
         You must evaluate *every single item* in the target checklist.
+        
+        CRITICAL INSTRUCTION FOR SUGGESTIONS:
+        For EVERY single checklist item that you mark as "Fail" or "Warning", you MUST provide a specific, actionable recommendation in the "suggestions" array on how to fix it. Do not group them. If 5 items fail, there must be at least 5 specific suggestions.
+        
         You must output a JSON object with the following structure:
         {{
-            "score": <0-100>,
             "checklist": [
                 {{"section": "<Section Name>", "item": "<Checklist Item>", "status": "<Pass/Fail/Warning>", "comment": "<Explanation>"}}
             ],
@@ -93,6 +95,24 @@ class AIEngine:
                 "custom_instructions": custom_instructions,
                 "checklist_context": checklist_context
             })
+            
+            # Programmatic Scoring Logic
+            total_items = len(response.get("checklist", []))
+            if total_items == 0:
+                response["score"] = 0
+            else:
+                score = 0
+                for item in response["checklist"]:
+                    status = str(item.get("status", "")).lower()
+                    if status == "pass":
+                        score += 1.0
+                    elif status == "warning":
+                        score += 0.5
+                    # fail gets 0
+                
+                final_score = int((score / total_items) * 100)
+                response["score"] = final_score
+
             return response
         except Exception as e:
             # Fallback or error handling

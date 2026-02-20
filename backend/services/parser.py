@@ -6,6 +6,12 @@ import pandas as pd
 from PIL import Image
 import pytesseract
 from pdf2image import convert_from_bytes
+import os
+
+# Configure Tesseract path for Windows
+tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+if os.path.exists(tesseract_path):
+    pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
 async def parse_file(file: UploadFile) -> str:
     content = ""
