@@ -125,7 +125,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
                             or <span className="text-indigo-600 hover:text-indigo-700 underline underline-offset-4 cursor-pointer">browse from your computer</span>
                         </p>
                         <div className="flex items-center gap-3 text-xs font-semibold text-slate-400 uppercase tracking-widest">
-                            <span>PDF</span>•<span>DOCX</span>•<span>MARKDOWN</span>•<span>CODE</span>
+                            <span>PDF</span>•<span>DOCX</span>•<span>XLSX</span>•<span>MARKDOWN</span>•<span>CODE</span>
                         </div>
                     </div>
                 )}

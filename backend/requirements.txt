@@ -12,4 +12,9 @@ pypdf
 python-docx
 python-dotenv
 httpx
+pandas
+openpyxl
+pdf2image
+pytesseract
+Pillow
 langchain-google-genai
