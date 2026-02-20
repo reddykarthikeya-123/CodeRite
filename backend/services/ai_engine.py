@@ -70,6 +70,7 @@ class AIEngine:
         CRITICAL INSTRUCTIONS FOR COMMENTS & SUGGESTIONS:
         1. For EVERY item marked "Fail" or "Warning", provide a specific, actionable recommendation in the "suggestions" array on how to fix it. Do not group them.
         2. For EVERY item marked "Pass", the "comment" field MUST contain actual evidence extracted from the document proving the pass (e.g., "Found title 'Project X' authored by John Doe", NOT just "The document has a title"). You must prove you read the specific detail.
+        3. If a checklist item contains multiple requirements (e.g. "Benefits AND expected outcomes"), and the document only fulfills one of them (e.g. only benefits are found), you MUST mark the status as "Warning", explaining exactly which part is missing in the comment.
         
         You must output a JSON object with the following structure:
         {{
