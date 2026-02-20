@@ -61,14 +61,22 @@ export const deleteConnection = async (id: number): Promise<void> => {
   });
 };
 
-export const uploadFile = async (file: File): Promise<{ content: string; filename: string }> => {
+export const uploadFile = async (file: File): Promise<{ filename: string; content: string }> => {
   const formData = new FormData();
   formData.append("file", file);
+
   const response = await fetch(`${API_BASE_URL}/upload`, {
     method: "POST",
     body: formData,
   });
-  if (!response.ok) throw new Error("Upload failed");
+  if (!response.ok) {
+    let errorMessage = "File upload failed";
+    try {
+      const errorData = await response.json();
+      if (errorData.detail) errorMessage = errorData.detail;
+    } catch (e) { }
+    throw new Error(errorMessage);
+  }
   return response.json();
 };
 

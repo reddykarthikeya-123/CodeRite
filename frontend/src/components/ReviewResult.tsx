@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { type ReviewResponse } from '../api';
-import { CheckCircle, XCircle, AlertTriangle, FileText, ChevronDown, ChevronUp, Edit3, ListChecks } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, FileText, ChevronDown, ChevronUp, Edit3, ListChecks, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 
@@ -10,6 +12,80 @@ interface ReviewResultProps {
 
 export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
     const [showRewritten, setShowRewritten] = useState(false);
+
+    const handleDownloadReport = () => {
+        const doc = new jsPDF();
+
+        doc.setFontSize(20);
+        doc.setTextColor(30, 41, 59);
+        doc.text("Compliance Audit Report", 14, 22);
+
+        doc.setFontSize(12);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`Overall Score: ${result.score}/100`, 14, 32);
+
+        const tableData = result.checklist.map(item => [
+            item.section || 'General',
+            item.item,
+            item.status,
+            item.comment || ''
+        ]);
+
+        autoTable(doc, {
+            startY: 40,
+            head: [['Section', 'Checklist Item', 'Status', 'Remarks']],
+            body: tableData,
+            theme: 'grid',
+            headStyles: { fillColor: [79, 70, 229] },
+            styles: { fontSize: 9, cellPadding: 3, overflow: 'linebreak' },
+            columnStyles: {
+                0: { cellWidth: 35 },
+                1: { cellWidth: 60 },
+                2: { cellWidth: 20, fontStyle: 'bold' },
+                3: { cellWidth: 'auto' }
+            },
+            didParseCell: function (data) {
+                if (data.section === 'body' && data.column.index === 2) {
+                    const status = data.cell.raw as string;
+                    if (status === 'Pass') {
+                        data.cell.styles.textColor = [16, 185, 129];
+                    } else if (status === 'Fail') {
+                        data.cell.styles.textColor = [244, 63, 94];
+                    } else if (status === 'Warning') {
+                        data.cell.styles.textColor = [245, 158, 11];
+                    }
+                }
+            }
+        });
+
+        const finalY = (doc as any).lastAutoTable.finalY || 40;
+        let currentY = finalY + 15;
+
+        if (result.suggestions && result.suggestions.length > 0) {
+            doc.setFontSize(14);
+            doc.setTextColor(30, 41, 59);
+            doc.text("Key Improvements & Suggestions", 14, currentY);
+            currentY += 8;
+
+            doc.setFontSize(10);
+            doc.setTextColor(71, 85, 105);
+
+            result.suggestions.forEach((suggestion, idx) => {
+                const text = `${idx + 1}. ${suggestion}`;
+                const splitText = doc.splitTextToSize(text, 180);
+
+                if (currentY + (splitText.length * 5) > 280) {
+                    doc.addPage();
+                    currentY = 20;
+                }
+
+                doc.text(splitText, 14, currentY);
+                currentY += splitText.length * 5 + 3;
+            });
+        }
+
+        doc.save('Audit_Report.pdf');
+    };
 
     const getScoreColor = (score: number) => {
         if (score >= 80) return 'text-emerald-500 bg-emerald-50 ring-emerald-100 shadow-emerald-500/20';
@@ -58,9 +134,17 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                         </div>
                         Compliance Audit
                     </h3>
-                    <span className="px-4 py-1.5 bg-slate-100 text-slate-700 text-sm font-bold rounded-full border border-slate-200">
-                        {result.checklist.length} Checks Validated
-                    </span>
+                    <div className="flex items-center gap-3">
+                        <span className="px-4 py-1.5 bg-slate-100 text-slate-700 text-sm font-bold rounded-full border border-slate-200">
+                            {result.checklist.length} Checks Validated
+                        </span>
+                        <button
+                            onClick={handleDownloadReport}
+                            className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                        >
+                            <Download className="w-4 h-4" /> Download Report
+                        </button>
+                    </div>
                 </div>
 
                 <div className="space-y-8">

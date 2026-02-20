@@ -19,7 +19,9 @@ async def parse_file(file: UploadFile) -> str:
             
         return content
     except Exception as e:
-         raise HTTPException(status_code=500, detail=f"Error parsing file: {str(e)}")
+         import traceback
+         err_trace = traceback.format_exc()
+         raise HTTPException(status_code=500, detail=f"Error parsing file: {str(e)}\n\n{err_trace}")
 
 async def _parse_pdf(file: UploadFile) -> str:
     content = await file.read()

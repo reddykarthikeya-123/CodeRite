@@ -138,7 +138,10 @@ async def upload_file(file: UploadFile = File(...)):
         content = await parse_file(file)
         return {"filename": file.filename, "content": content}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        err_msg = traceback.format_exc()
+        print(f"Upload Error: {err_msg}")
+        raise HTTPException(status_code=500, detail=str(err_msg))
 
 @app.post("/api/analyze")
 async def analyze_document(request: AnalysisRequest, db: AsyncSession = Depends(get_db)):

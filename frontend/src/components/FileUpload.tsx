@@ -30,8 +30,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
         try {
             const data = await uploadFile(file);
             onFileProcessed(data.content, data.filename, selectedCategory);
-        } catch (err: unknown) {
-            setError("Failed to upload file. Please try again.");
+        } catch (err: any) {
+            setError(`Upload Failed: ${err.message || 'Unknown error. Please check backend logs.'}`);
             console.error(err);
         } finally {
             setUploading(false);
@@ -91,8 +91,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
 
             <motion.div
                 className={`relative overflow-hidden border-2 border-dashed rounded-3xl p-12 text-center cursor-pointer transition-all duration-300 ${isDragging
-                        ? 'border-indigo-500 bg-indigo-50/80 shadow-[inset_0_0_50px_rgba(99,102,241,0.1)] scale-[1.02]'
-                        : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-50 hover:shadow-xl hover:shadow-indigo-500/10'
+                    ? 'border-indigo-500 bg-indigo-50/80 shadow-[inset_0_0_50px_rgba(99,102,241,0.1)] scale-[1.02]'
+                    : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-50 hover:shadow-xl hover:shadow-indigo-500/10'
                     }`}
                 onDragOver={onDragOver}
                 onDragLeave={onDragLeave}
