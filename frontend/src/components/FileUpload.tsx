@@ -105,6 +105,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
                     type="file"
                     className="hidden"
                     ref={fileInputRef}
+                    accept=".pdf,.docx,.txt,.md,.py,.js,.ts,.json,.html,.css,.xlsx,.csv,.xls,.pptx"
                     onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
                 />
 
@@ -124,9 +125,12 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
                         <p className="text-slate-500 mb-6">
                             or <span className="text-indigo-600 hover:text-indigo-700 underline underline-offset-4 cursor-pointer">browse from your computer</span>
                         </p>
-                        <div className="flex items-center gap-3 text-xs font-semibold text-slate-400 uppercase tracking-widest">
-                            <span>PDF</span>•<span>DOCX</span>•<span>XLSX</span>•<span>MARKDOWN</span>•<span>CODE</span>
-                        </div>
+                        <p className="text-slate-500 text-sm mt-3 font-medium">
+                            Supports PDFs, Word Docs (.docx), Excel (.xlsx, .csv), and PowerPoint (.pptx)
+                        </p>
+                        <p className="text-slate-400 text-xs mt-1">
+                            Embedded flowcharts and screenshots are automatically graded via AI Vision.
+                        </p>
                     </div>
                 )}
             </motion.div>

@@ -1,6 +1,7 @@
 from fastapi import UploadFile, HTTPException
 from pypdf import PdfReader
 from docx import Document
+from pptx import Presentation
 import io
 import pandas as pd
 from PIL import Image
@@ -24,6 +25,8 @@ async def parse_file(file: UploadFile) -> dict:
             content, images = await _parse_pdf(file)
         elif filename.endswith(".docx"):
             content, images = await _parse_docx(file)
+        elif filename.endswith(".pptx"):
+            content, images = await _parse_pptx(file)
         elif filename.endswith((".txt", ".md", ".py", ".js", ".ts", ".json", ".html", ".css")):
             content = await _parse_text(file)
             images = []
@@ -100,6 +103,48 @@ async def _parse_docx(file: UploadFile) -> tuple[str, list]:
     except Exception as e:
         print(f"OCR/Vision warning on Docx: {e}")
         
+    return text, base64_images
+
+async def _parse_pptx(file: UploadFile) -> tuple[str, list]:
+    content = await file.read()
+    prs = Presentation(io.BytesIO(content))
+    text = ""
+    base64_images = []
+    
+    for i, slide in enumerate(prs.slides):
+        text += f"\n--- Slide {i+1} ---\n"
+        
+        # Extract text from shapes
+        for shape in slide.shapes:
+            if hasattr(shape, "text") and shape.text.strip():
+                text += shape.text + "\n"
+                
+            # Extract images for Multi-Modal AI
+            if getattr(shape, "shape_type", None) == 13: # 13 is msoPicture
+                try:
+                    img_bytes = shape.image.blob
+                    img = Image.open(io.BytesIO(img_bytes))
+                    
+                    # Convert to Base64
+                    buffered = io.BytesIO()
+                    if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+                    img.save(buffered, format="JPEG")
+                    img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                    base64_images.append(img_b64)
+                    
+                    # OCR fallback
+                    ocr_text = pytesseract.image_to_string(img)
+                    if ocr_text.strip():
+                        text += f"\n[Embedded Image OCR]: {ocr_text}\n"
+                except Exception as e:
+                    print(f"Failed to process image on slide {i+1}: {e}")
+                    
+        # Extract Speaker Notes
+        if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
+            notes = slide.notes_slide.notes_text_frame.text
+            if notes.strip():
+                text += f"\n[Speaker Notes]:\n{notes}\n"
+                
     return text, base64_images
 
 async def _parse_text(file: UploadFile) -> str:
