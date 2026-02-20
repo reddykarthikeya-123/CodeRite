@@ -1,0 +1,506 @@
+{
+  "sheets": [
+    "Business Requirements document",
+    "Configuration Document",
+    "Functional Design Document",
+    "Test Scripts"
+  ],
+  "data": {
+    "Business Requirements document": [
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "Document has a clear title, version, author, and date."
+      },
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "Includes a document control and revision history section."
+      },
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "Document purpose and audience are clearly stated."
+      },
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "References related documents (e.g., project charter,  specs)."
+      },
+      {
+        "Section": "Business Context and Objectives",
+        "ChecklistItem": "Business drivers and context are explained."
+      },
+      {
+        "Section": "Business Context and Objectives",
+        "ChecklistItem": "Benefits and expected outcomes are described."
+      },
+      {
+        "Section": "Stakeholders and Roles",
+        "ChecklistItem": "Stakeholders, roles, and responsibilities are identified."
+      },
+      {
+        "Section": "Stakeholders and Roles",
+        "ChecklistItem": "Stakeholder needs and expectations are captured."
+      },
+      {
+        "Section": "Scope Definition",
+        "ChecklistItem": "In-scope processes, systems, and functions are clearly listed."
+      },
+      {
+        "Section": "Scope Definition",
+        "ChecklistItem": "Out-of-scope items are explicitly stated."
+      },
+      {
+        "Section": "Scope Definition",
+        "ChecklistItem": "Scope aligns with project charter or business case."
+      },
+      {
+        "Section": "Requirement Details",
+        "ChecklistItem": "Each requirement is uniquely identified and clearly written."
+      },
+      {
+        "Section": "Requirement Details",
+        "ChecklistItem": "Requirements are SMART (Specific, Measurable, Achievable, Relevant, Time-bound)."
+      },
+      {
+        "Section": "Requirement Details",
+        "ChecklistItem": "Requirements are categorized (e.g., functional, non-functional, reporting)."
+      },
+      {
+        "Section": "Requirement Details",
+        "ChecklistItem": "Business rules and logic are clearly documented."
+      },
+      {
+        "Section": "Requirement Details",
+        "ChecklistItem": "As-Is and To-Be states are clearly described"
+      },
+      {
+        "Section": "Requirement Details",
+        "ChecklistItem": "Requirements are written in business-friendly language."
+      },
+      {
+        "Section": "Assumptions and Constraints",
+        "ChecklistItem": "All relevant assumptions are listed and validated."
+      },
+      {
+        "Section": "Assumptions and Constraints",
+        "ChecklistItem": "Constraints (e.g., time, resources, system limitations) are documented."
+      },
+      {
+        "Section": "Dependencies and Interfaces",
+        "ChecklistItem": "Dependencies on systems, processes, or teams are identified."
+      },
+      {
+        "Section": "Dependencies and Interfaces",
+        "ChecklistItem": "Interfaces and integration points are described."
+      },
+      {
+        "Section": "Compliance and Standards",
+        "ChecklistItem": "Compliance with regulatory or industry standards is considered."
+      },
+      {
+        "Section": "Acceptance Criteria",
+        "ChecklistItem": "Clear acceptance criteria are provided for each requirement."
+      },
+      {
+        "Section": "Traceability",
+        "ChecklistItem": "Requirements are mapped to source documents or business goals."
+      },
+      {
+        "Section": "Open/Closed points",
+        "ChecklistItem": "List of Open and Closed points to be documented properly."
+      },
+      {
+        "Section": "Review and Approval",
+        "ChecklistItem": "Reviewed by all relevant stakeholders."
+      },
+      {
+        "Section": "Review and Approval",
+        "ChecklistItem": "Review comments and updates are documented."
+      },
+      {
+        "Section": "Review and Approval",
+        "ChecklistItem": "Final version is approved and signed off."
+      }
+    ],
+    "Configuration Document": [
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "Document includes title, version, author, and date."
+      },
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "Revision history is maintained and accurate."
+      },
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "Purpose and scope of the document are clearly defined."
+      },
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "References related documents (e.g., BRD, FDS, test cases)."
+      },
+      {
+        "Section": "System and Module Identification",
+        "ChecklistItem": "System (ERP) and specific module(s) are clearly identified."
+      },
+      {
+        "Section": "System and Module Identification",
+        "ChecklistItem": "Configuration environment (DEV, QA, PROD) is specified."
+      },
+      {
+        "Section": "Configuration Details",
+        "ChecklistItem": "Configuration steps are described in detail."
+      },
+      {
+        "Section": "Configuration Details",
+        "ChecklistItem": "Screen paths (menu navigation) and transaction codes are provided."
+      },
+      {
+        "Section": "Configuration Details",
+        "ChecklistItem": "Field-level settings and values are clearly defined."
+      },
+      {
+        "Section": "Configuration Details",
+        "ChecklistItem": "Custom settings vs. standard settings are distinguished."
+      },
+      {
+        "Section": "Configuration Details",
+        "ChecklistItem": "Screenshots are included for clarity and verification."
+      },
+      {
+        "Section": "Process Alignment",
+        "ChecklistItem": "Configuration supports defined business processes."
+      },
+      {
+        "Section": "Process Alignment",
+        "ChecklistItem": "Any changes to standard process flow are explained."
+      },
+      {
+        "Section": "Process Alignment",
+        "ChecklistItem": "Configuration decisions are justified with business rationale."
+      },
+      {
+        "Section": "Data Setup",
+        "ChecklistItem": "Master and transactional data dependencies are described."
+      },
+      {
+        "Section": "Data Setup",
+        "ChecklistItem": "Default values and mandatory fields are specified."
+      },
+      {
+        "Section": "Security and Roles",
+        "ChecklistItem": "User roles impacted by configuration are listed."
+      },
+      {
+        "Section": "Security and Roles",
+        "ChecklistItem": "Access controls for configuration settings are described."
+      },
+      {
+        "Section": "Impact and Dependencies",
+        "ChecklistItem": "Dependencies on other modules or systems are identified."
+      },
+      {
+        "Section": "Impact and Dependencies",
+        "ChecklistItem": "Potential downstream impacts are assessed."
+      },
+      {
+        "Section": "Compliance and Standards",
+        "ChecklistItem": "Compliance with organizational and vendor standards is confirmed."
+      },
+      {
+        "Section": "Review and Approval",
+        "ChecklistItem": "Document is peer-reviewed for accuracy and completeness."
+      },
+      {
+        "Section": "Review and Approval",
+        "ChecklistItem": "Comments from reviewers are addressed."
+      },
+      {
+        "Section": "Review and Approval",
+        "ChecklistItem": "Final version is approved and signed off."
+      }
+    ],
+    "Functional Design Document": [
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "Document has a clear title, version number"
+      },
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "Correct Functional Design template is used"
+      },
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "Includes a revision history with changes, Authors, approvers and dates"
+      },
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "States the objective and scope of the custom development."
+      },
+      {
+        "Section": "Document Basics",
+        "ChecklistItem": "Lists related documents (e.g., BRD, Technical Specs, Process Flows)."
+      },
+      {
+        "Section": "Business Requirement Alignment",
+        "ChecklistItem": "All business requirements are clearly stated or referenced."
+      },
+      {
+        "Section": "Business Requirement Alignment",
+        "ChecklistItem": "Functional design aligns with the approved business requirements."
+      },
+      {
+        "Section": "Business Requirement Alignment",
+        "ChecklistItem": "Assumptions and constraints are clearly stated."
+      },
+      {
+        "Section": "Functional Process Design",
+        "ChecklistItem": "Process flows or diagrams are included and accurate."
+      },
+      {
+        "Section": "Functional Process Design",
+        "ChecklistItem": "Clearly defines input, process logic, and output."
+      },
+      {
+        "Section": "Functional Process Design",
+        "ChecklistItem": "All custom logic is documented with decision criteria of the business logic."
+      },
+      {
+        "Section": "Functional Process Design",
+        "ChecklistItem": "Lists down all the names of custom objects created like Process names, lookup, profile options etc"
+      },
+      {
+        "Section": "Functional Process Design",
+        "ChecklistItem": "Lists down , describes exceptions and error handling scenarios"
+      },
+      {
+        "Section": "Functional Process Design",
+        "ChecklistItem": "Process steps are traceable to business requirements"
+      },
+      {
+        "Section": "Form and User Interface Design \n(If applicable)",
+        "ChecklistItem": "UI/UX elements are described and prototyped with mock up screen layouts"
+      },
+      {
+        "Section": "Form and User Interface Design \n(If applicable)",
+        "ChecklistItem": "Field-level design, validations, and default values are defined"
+      },
+      {
+        "Section": "Form and User Interface Design \n(If applicable)",
+        "ChecklistItem": "Navigation logic is clear and user-friendly"
+      },
+      {
+        "Section": "Reporting and Output Requirements\n (If applicable)",
+        "ChecklistItem": "Report layout and content requirements are documented."
+      },
+      {
+        "Section": "Reporting and Output Requirements\n (If applicable)",
+        "ChecklistItem": "Filters, sorting, and grouping logic are defined."
+      },
+      {
+        "Section": "Reporting and Output Requirements\n (If applicable)",
+        "ChecklistItem": "The report field descriptions and derivation logic clearly documented"
+      },
+      {
+        "Section": "Reporting and Output Requirements\n (If applicable)",
+        "ChecklistItem": "Output formats (PDF, Excel, etc.) are specified."
+      },
+      {
+        "Section": "Data integration Requirements  \n(If Applicable)",
+        "ChecklistItem": "Master and transactional data requirements are identified and clearly documented"
+      },
+      {
+        "Section": "Data integration Requirements  \n(If Applicable)",
+        "ChecklistItem": "Source and target systems are documented along with the middleware details as applicable"
+      },
+      {
+        "Section": "Data integration Requirements  \n(If Applicable)",
+        "ChecklistItem": "Data mappings and transformation logic are included."
+      },
+      {
+        "Section": "Data integration Requirements  \n(If Applicable)",
+        "ChecklistItem": "Integration points (APIs, middleware, interfaces) are specified"
+      },
+      {
+        "Section": "Security and Authorization",
+        "ChecklistItem": "Required user roles and access levels are defined."
+      },
+      {
+        "Section": "Security and Authorization",
+        "ChecklistItem": "Sensitive data handling and visibility are addressed."
+      },
+      {
+        "Section": "Security and Authorization",
+        "ChecklistItem": "Complies with organizational security policies."
+      },
+      {
+        "Section": "Validation and Testing Criteria",
+        "ChecklistItem": "Includes functional acceptance criteria."
+      },
+      {
+        "Section": "Validation and Testing Criteria",
+        "ChecklistItem": "Lists test scenarios or test conditions for UAT."
+      },
+      {
+        "Section": "Validation and Testing Criteria",
+        "ChecklistItem": "Describes expected results for major use cases."
+      },
+      {
+        "Section": "Impact and Dependencies",
+        "ChecklistItem": "Identifies impact on existing processes or modules."
+      },
+      {
+        "Section": "Impact and Dependencies",
+        "ChecklistItem": "Lists dependencies on other customizations or systems."
+      },
+      {
+        "Section": "Impact and Dependencies",
+        "ChecklistItem": "Flags any obsolete or replaced functionality."
+      },
+      {
+        "Section": "Compliance and Standards",
+        "ChecklistItem": "Follows ERP vendor\u2019s development guidelines (e.g., SAP, Oracle)."
+      },
+      {
+        "Section": "Compliance and Standards",
+        "ChecklistItem": "Naming conventions, code structures, and documentation are standardized."
+      },
+      {
+        "Section": "Compliance and Standards",
+        "ChecklistItem": "Adheres to internal governance and change management policies."
+      },
+      {
+        "Section": "Review and Approval",
+        "ChecklistItem": "Document is peer-reviewed for accuracy and completeness."
+      },
+      {
+        "Section": "Review and Approval",
+        "ChecklistItem": "Comments from reviewers are addressed."
+      },
+      {
+        "Section": "Review and Approval",
+        "ChecklistItem": "Final version is approved and signed off."
+      }
+    ],
+    "Test Scripts": [
+      {
+        "Section": "Basic Information",
+        "ChecklistItem": "Test script includes unique ID, title, version, and author."
+      },
+      {
+        "Section": "Basic Information",
+        "ChecklistItem": "Clearly states the module, process area, and functionality under test."
+      },
+      {
+        "Section": "Basic Information",
+        "ChecklistItem": "Document includes preparer, reviewer, and approver sections."
+      },
+      {
+        "Section": "Basic Information",
+        "ChecklistItem": "Test script is traceable to related business requirement or user story."
+      },
+      {
+        "Section": "Test Script Structure",
+        "ChecklistItem": "Test objective and purpose are clearly defined."
+      },
+      {
+        "Section": "Test Script Structure",
+        "ChecklistItem": "Preconditions (prerequisites, setup conditions) are documented."
+      },
+      {
+        "Section": "Test Script Structure",
+        "ChecklistItem": "Test data required for execution is specified."
+      },
+      {
+        "Section": "Test Script Structure",
+        "ChecklistItem": "Step-by-step instructions are clear, numbered, and logical."
+      },
+      {
+        "Section": "Test Script Structure",
+        "ChecklistItem": "Expected results are defined for each step."
+      },
+      {
+        "Section": "Test Script Structure",
+        "ChecklistItem": "Pass/fail criteria are objective and measurable."
+      },
+      {
+        "Section": "Test Script Structure",
+        "ChecklistItem": "Includes postconditions (e.g., data cleanup, next steps)."
+      },
+      {
+        "Section": "Coverage and Accuracy",
+        "ChecklistItem": "Covers all relevant business scenarios (positive and negative)."
+      },
+      {
+        "Section": "Coverage and Accuracy",
+        "ChecklistItem": "Includes test cases for exceptions and boundary conditions."
+      },
+      {
+        "Section": "Coverage and Accuracy",
+        "ChecklistItem": "All functional requirements are mapped to at least one test case."
+      },
+      {
+        "Section": "Coverage and Accuracy",
+        "ChecklistItem": "Validates integrations and data flow where applicable."
+      },
+      {
+        "Section": "Coverage and Accuracy",
+        "ChecklistItem": "Includes relevant workflow or approval processes."
+      },
+      {
+        "Section": "Usability and Clarity",
+        "ChecklistItem": "Uses business terminology that end users understand."
+      },
+      {
+        "Section": "Usability and Clarity",
+        "ChecklistItem": "Avoids ambiguous or overly technical language."
+      },
+      {
+        "Section": "Usability and Clarity",
+        "ChecklistItem": "Includes relevant screenshots, forms, or references. Screenshot is mandatory for every test result"
+      },
+      {
+        "Section": "Usability and Clarity",
+        "ChecklistItem": "Formatting is consistent and readable (e.g., tables, bolding, bullets)."
+      },
+      {
+        "Section": "Test Data and Environment",
+        "ChecklistItem": "Test data is realistic and representative of production scenarios."
+      },
+      {
+        "Section": "Test Data and Environment",
+        "ChecklistItem": "Environment (DEV, QA, UAT) required for testing is specified."
+      },
+      {
+        "Section": "Test Data and Environment",
+        "ChecklistItem": "Dependencies on other systems or modules are clearly stated."
+      },
+      {
+        "Section": "Test Data and Environment",
+        "ChecklistItem": "User roles and permissions for test execution are defined."
+      },
+      {
+        "Section": "Defect Handling and Traceability",
+        "ChecklistItem": "Instructions for logging defects are included."
+      },
+      {
+        "Section": "Defect Handling and Traceability",
+        "ChecklistItem": "Each test step provides traceability to test results or defect IDs."
+      },
+      {
+        "Section": "Defect Handling and Traceability",
+        "ChecklistItem": "Retesting or regression steps are documented if applicable."
+      },
+      {
+        "Section": "Review and Approval",
+        "ChecklistItem": "Reviewed by both functional and technical stakeholders."
+      },
+      {
+        "Section": "Review and Approval",
+        "ChecklistItem": "Peer-reviewed for completeness and accuracy."
+      },
+      {
+        "Section": "Review and Approval",
+        "ChecklistItem": "Final script is approved and signed off for use in UAT or SIT."
+      }
+    ]
+  }
+}

@@ -1,0 +1,648 @@
+{
+  "sheets": [
+    "Business Requirements document",
+    "Configuration Document",
+    "Functional Design Document",
+    "Test Scripts"
+  ],
+  "data": {
+    "Business Requirements document": [
+      {
+        "QA Reviewer Name": "Section",
+        "Unnamed: 1": "Checklist Item",
+        "Unnamed: 2": "Review Result"
+      },
+      {
+        "QA Reviewer Name": "Document Basics",
+        "Unnamed: 1": "Document has a clear title, version, author, and date.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Includes a document control and revision history section.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Document purpose and audience are clearly stated.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "References related documents (e.g., project charter,  specs).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Business Context and Objectives",
+        "Unnamed: 1": "Business drivers and context are explained.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Benefits and expected outcomes are described.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Stakeholders and Roles",
+        "Unnamed: 1": "Stakeholders, roles, and responsibilities are identified.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Stakeholder needs and expectations are captured.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Scope Definition",
+        "Unnamed: 1": "In-scope processes, systems, and functions are clearly listed.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Out-of-scope items are explicitly stated.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Scope aligns with project charter or business case.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Requirement Details",
+        "Unnamed: 1": "Each requirement is uniquely identified and clearly written.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Requirements are SMART (Specific, Measurable, Achievable, Relevant, Time-bound).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Requirements are categorized (e.g., functional, non-functional, reporting).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Business rules and logic are clearly documented.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "As-Is and To-Be states are clearly described",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Requirements are written in business-friendly language.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Assumptions and Constraints",
+        "Unnamed: 1": "All relevant assumptions are listed and validated.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Constraints (e.g., time, resources, system limitations) are documented.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Dependencies and Interfaces",
+        "Unnamed: 1": "Dependencies on systems, processes, or teams are identified.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Interfaces and integration points are described.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Compliance and Standards",
+        "Unnamed: 1": "Compliance with regulatory or industry standards is considered.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Acceptance Criteria",
+        "Unnamed: 1": "Clear acceptance criteria are provided for each requirement.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Traceability",
+        "Unnamed: 1": "Requirements are mapped to source documents or business goals.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Open/Closed points",
+        "Unnamed: 1": "List of Open and Closed points to be documented properly.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Review and Approval",
+        "Unnamed: 1": "Reviewed by all relevant stakeholders.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Review comments and updates are documented.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Final version is approved and signed off.",
+        "Unnamed: 2": NaN
+      }
+    ],
+    "Configuration Document": [
+      {
+        "QA Reviewer Name": "Section",
+        "Unnamed: 1": "Checklist Item",
+        "Unnamed: 2": "Review Result"
+      },
+      {
+        "QA Reviewer Name": "Document Basics",
+        "Unnamed: 1": "Document includes title, version, author, and date.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Revision history is maintained and accurate.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Purpose and scope of the document are clearly defined.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "References related documents (e.g., BRD, FDS, test cases).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "System and Module Identification",
+        "Unnamed: 1": "System (ERP) and specific module(s) are clearly identified.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Configuration environment (DEV, QA, PROD) is specified.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Configuration Details",
+        "Unnamed: 1": "Configuration steps are described in detail.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Screen paths (menu navigation) and transaction codes are provided.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Field-level settings and values are clearly defined.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Custom settings vs. standard settings are distinguished.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Screenshots are included for clarity and verification.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Process Alignment",
+        "Unnamed: 1": "Configuration supports defined business processes.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Any changes to standard process flow are explained.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Configuration decisions are justified with business rationale.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Data Setup",
+        "Unnamed: 1": "Master and transactional data dependencies are described.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Default values and mandatory fields are specified.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Security and Roles",
+        "Unnamed: 1": "User roles impacted by configuration are listed.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Access controls for configuration settings are described.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Impact and Dependencies",
+        "Unnamed: 1": "Dependencies on other modules or systems are identified.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Potential downstream impacts are assessed.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Compliance and Standards",
+        "Unnamed: 1": "Compliance with organizational and vendor standards is confirmed.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Review and Approval",
+        "Unnamed: 1": "Document is peer-reviewed for accuracy and completeness.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Comments from reviewers are addressed.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Final version is approved and signed off.",
+        "Unnamed: 2": NaN
+      }
+    ],
+    "Functional Design Document": [
+      {
+        "QA Reviewer Name": "Section",
+        "Unnamed: 1": "Checklist Item",
+        "Unnamed: 2": "Review Result"
+      },
+      {
+        "QA Reviewer Name": "Document Basics",
+        "Unnamed: 1": "Document has a clear title, version number",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Correct Functional Design template is used",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Includes a revision history with changes, Authors, approvers and dates",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "States the objective and scope of the custom development.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Lists related documents (e.g., BRD, Technical Specs, Process Flows).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Business Requirement Alignment",
+        "Unnamed: 1": "All business requirements are clearly stated or referenced.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Functional design aligns with the approved business requirements.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Assumptions and constraints are clearly stated.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Functional Process Design",
+        "Unnamed: 1": "Process flows or diagrams are included and accurate.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Clearly defines input, process logic, and output.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "All custom logic is documented with decision criteria of the business logic.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Lists down all the names of custom objects created like Process names, lookup, profile options etc",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Lists down , describes exceptions and error handling scenarios",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Process steps are traceable to business requirements",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Form and User Interface Design \n(If applicable)",
+        "Unnamed: 1": "UI/UX elements are described and prototyped with mock up screen layouts",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Field-level design, validations, and default values are defined",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Navigation logic is clear and user-friendly",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Reporting and Output Requirements\n (If applicable)",
+        "Unnamed: 1": "Report layout and content requirements are documented.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Filters, sorting, and grouping logic are defined.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "The report field descriptions and derivation logic clearly documented",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Output formats (PDF, Excel, etc.) are specified.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Data integration Requirements  \n(If Applicable)",
+        "Unnamed: 1": "Master and transactional data requirements are identified and clearly documented",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Source and target systems are documented along with the middleware details as applicable",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Data mappings and transformation logic are included.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Integration points (APIs, middleware, interfaces) are specified",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Security and Authorization",
+        "Unnamed: 1": "Required user roles and access levels are defined.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Sensitive data handling and visibility are addressed.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Complies with organizational security policies.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Validation and Testing Criteria",
+        "Unnamed: 1": "Includes functional acceptance criteria.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Lists test scenarios or test conditions for UAT.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Describes expected results for major use cases.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Impact and Dependencies",
+        "Unnamed: 1": "Identifies impact on existing processes or modules.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Lists dependencies on other customizations or systems.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Flags any obsolete or replaced functionality.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Compliance and Standards",
+        "Unnamed: 1": "Follows ERP vendor\u2019s development guidelines (e.g., SAP, Oracle).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Naming conventions, code structures, and documentation are standardized.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Adheres to internal governance and change management policies.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Review and Approval",
+        "Unnamed: 1": "Document is peer-reviewed for accuracy and completeness.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Comments from reviewers are addressed.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Final version is approved and signed off.",
+        "Unnamed: 2": NaN
+      }
+    ],
+    "Test Scripts": [
+      {
+        "QA Reviewer Name": "Section",
+        "Unnamed: 1": "Checklist Item",
+        "Unnamed: 2": "Review Result"
+      },
+      {
+        "QA Reviewer Name": "Basic Information",
+        "Unnamed: 1": "Test script includes unique ID, title, version, and author.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Clearly states the module, process area, and functionality under test.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Document includes preparer, reviewer, and approver sections.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Test script is traceable to related business requirement or user story.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Test Script Structure",
+        "Unnamed: 1": "Test objective and purpose are clearly defined.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Preconditions (prerequisites, setup conditions) are documented.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Test data required for execution is specified.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Step-by-step instructions are clear, numbered, and logical.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Expected results are defined for each step.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Pass/fail criteria are objective and measurable.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Includes postconditions (e.g., data cleanup, next steps).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Coverage and Accuracy",
+        "Unnamed: 1": "Covers all relevant business scenarios (positive and negative).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Includes test cases for exceptions and boundary conditions.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "All functional requirements are mapped to at least one test case.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Validates integrations and data flow where applicable.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Includes relevant workflow or approval processes.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Usability and Clarity",
+        "Unnamed: 1": "Uses business terminology that end users understand.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Avoids ambiguous or overly technical language.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Includes relevant screenshots, forms, or references. Screenshot is mandatory for every test result",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Formatting is consistent and readable (e.g., tables, bolding, bullets).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Test Data and Environment",
+        "Unnamed: 1": "Test data is realistic and representative of production scenarios.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Environment (DEV, QA, UAT) required for testing is specified.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Dependencies on other systems or modules are clearly stated.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "User roles and permissions for test execution are defined.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Defect Handling and Traceability",
+        "Unnamed: 1": "Instructions for logging defects are included.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Each test step provides traceability to test results or defect IDs.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Retesting or regression steps are documented if applicable.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Review and Approval",
+        "Unnamed: 1": "Reviewed by both functional and technical stakeholders.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Peer-reviewed for completeness and accuracy.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Final script is approved and signed off for use in UAT or SIT.",
+        "Unnamed: 2": NaN
+      }
+    ]
+  }
+}
