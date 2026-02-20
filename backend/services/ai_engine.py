@@ -67,8 +67,9 @@ class AIEngine:
         Your task is to review the provided document against standard best practices, any custom instructions, and strictly against the Target Checklist provided.
         You must evaluate *every single item* in the target checklist.
         
-        CRITICAL INSTRUCTION FOR SUGGESTIONS:
-        For EVERY single checklist item that you mark as "Fail" or "Warning", you MUST provide a specific, actionable recommendation in the "suggestions" array on how to fix it. Do not group them. If 5 items fail, there must be at least 5 specific suggestions.
+        CRITICAL INSTRUCTIONS FOR COMMENTS & SUGGESTIONS:
+        1. For EVERY item marked "Fail" or "Warning", provide a specific, actionable recommendation in the "suggestions" array on how to fix it. Do not group them.
+        2. For EVERY item marked "Pass", the "comment" field MUST contain actual evidence extracted from the document proving the pass (e.g., "Found title 'Project X' authored by John Doe", NOT just "The document has a title"). You must prove you read the specific detail.
         
         You must output a JSON object with the following structure:
         {{
