@@ -3,8 +3,10 @@ import { type ReviewResponse } from '../api';
 import { CheckCircle, XCircle, AlertTriangle, FileText, ChevronDown, ChevronUp, Edit3, ListChecks, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useSpring, useTransform, useMotionValue } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import clsx from 'clsx';
+import { useEffect } from 'react';
 
 interface ReviewResultProps {
     result: ReviewResponse;
@@ -12,6 +14,15 @@ interface ReviewResultProps {
 
 export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
     const [showRewritten, setShowRewritten] = useState(false);
+
+    // Animated Score Logic
+    const animatedScore = useMotionValue(0);
+    const springScore = useSpring(animatedScore, { duration: 2500, bounce: 0.2 });
+    const displayScore = useTransform(springScore, (latest) => Math.round(latest));
+
+    useEffect(() => {
+        animatedScore.set(result.score);
+    }, [result.score, animatedScore]);
 
     const handleDownloadReport = () => {
         const doc = new jsPDF();
@@ -102,6 +113,21 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
         }, {} as Record<string, typeof result.checklist>);
     }, [result.checklist]);
 
+    const containerVariants: Variants = {
+        hidden: { opacity: 0 },
+        show: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    };
+
+    const itemVariants: Variants = {
+        hidden: { opacity: 0, x: -20 },
+        show: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    };
+
     return (
         <div className="space-y-8">
             {/* Score Card */}
@@ -112,9 +138,14 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
             >
                 <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
                 <div className="flex flex-col items-center">
-                    <div className={clsx("w-40 h-40 rounded-full flex items-center justify-center border-[6px] border-white shadow-2xl text-6xl font-black ring-8 ring-offset-4 mb-6 transition-all", getScoreColor(result.score))}>
-                        {result.score}
-                    </div>
+                    <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }}
+                        className={clsx("w-40 h-40 rounded-full flex items-center justify-center border-[6px] border-white shadow-2xl text-6xl font-black ring-8 ring-offset-4 mb-6 transition-colors duration-1000", getScoreColor(result.score))}
+                    >
+                        <motion.span>{displayScore}</motion.span>
+                    </motion.div>
                     <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Compliance Score</h2>
                     <p className="text-slate-500 mt-2 max-w-md mx-auto line-clamp-2">Aggregated quality rating based on structural integrity, strict checklist compliance, and industry best practices.</p>
                 </div>
@@ -147,9 +178,14 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                     </div>
                 </div>
 
-                <div className="space-y-8">
+                <motion.div
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="show"
+                    className="space-y-8"
+                >
                     {Object.entries(groupedChecklist).map(([section, items], idx) => (
-                        <div key={idx} className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-slate-50/30">
+                        <motion.div variants={itemVariants} key={idx} className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-slate-50/30">
                             <div className="bg-slate-50/80 px-5 py-4 border-b border-slate-200/80 backdrop-blur-sm relative">
                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-400" />
                                 <h4 className="font-bold text-slate-800 pl-2 tracking-wide uppercase text-sm">{section}</h4>
@@ -181,9 +217,9 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                        </motion.div>
                     ))}
-                </div>
+                </motion.div>
             </motion.div>
 
             {/* Suggestions */}
@@ -200,14 +236,19 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                     </div>
                     Key Improvements & Suggestions
                 </h3>
-                <ul className="space-y-4 relative z-10">
+                <motion.ul
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="show"
+                    className="space-y-4 relative z-10"
+                >
                     {result.suggestions.map((suggestion, idx) => (
-                        <li key={idx} className="flex gap-4 text-indigo-100 bg-white/5 backdrop-blur-md p-5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors">
+                        <motion.li variants={itemVariants} key={idx} className="flex gap-4 text-indigo-100 bg-white/5 backdrop-blur-md p-5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors">
                             <span className="font-black text-indigo-400 text-lg">{idx + 1}.</span>
                             <span className="leading-relaxed">{suggestion}</span>
-                        </li>
+                        </motion.li>
                     ))}
-                </ul>
+                </motion.ul>
             </motion.div>
 
             {/* Rewritten Content Expander */}

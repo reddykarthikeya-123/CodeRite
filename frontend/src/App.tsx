@@ -12,6 +12,26 @@ function App() {
   const [analyzing, setAnalyzing] = useState(false);
   const [currentFile, setCurrentFile] = useState<{ content: string, filename: string } | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [loadingStage, setLoadingStage] = useState(0);
+
+  const loadingStages = [
+    "Extracting text and structure...",
+    "Scanning embedded diagrams using Vision AI...",
+    "Cross-referencing enterprise compliance hooks...",
+    "Generating actionable feedback..."
+  ];
+
+  // Animate loading text
+  useEffect(() => {
+    if (analyzing) {
+      const interval = setInterval(() => {
+        setLoadingStage((prev) => (prev + 1) % loadingStages.length);
+      }, 3500);
+      return () => clearInterval(interval);
+    } else {
+      setLoadingStage(0);
+    }
+  }, [analyzing, loadingStages.length]);
 
   // Add keyboard shortcut for settings
   useEffect(() => {
@@ -118,18 +138,31 @@ function App() {
                 </div>
               </div>
               <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Auditing {currentFile?.filename}...</h3>
-              <p className="text-slate-500 mt-3 text-center max-w-md">
-                Running compliance checks and generating intelligent suggestions based on the target framework.
-              </p>
 
-              {/* Fake Progress Bar */}
-              <div className="w-full max-w-xs mt-8 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={loadingStage}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="text-slate-500 mt-3 text-center max-w-md h-6 font-medium"
+                >
+                  {loadingStages[loadingStage]}
+                </motion.p>
+              </AnimatePresence>
+
+              {/* Enhanced Progress Bar */}
+              <div className="w-full max-w-xs mt-8 h-1.5 bg-slate-100 rounded-full overflow-hidden relative">
+                <div className="absolute inset-0 bg-indigo-500/10 animate-pulse"></div>
                 <motion.div
                   initial={{ width: "0%" }}
-                  animate={{ width: "80%" }}
-                  transition={{ duration: 15, ease: "easeOut" }}
-                  className="h-full bg-indigo-500 rounded-full"
-                />
+                  animate={{ width: "90%" }}
+                  transition={{ duration: 25, ease: "circOut" }}
+                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full relative"
+                >
+                  <div className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-r from-transparent to-white/40 animate-[shimmer_2s_infinite]"></div>
+                </motion.div>
               </div>
             </motion.div>
           )}
