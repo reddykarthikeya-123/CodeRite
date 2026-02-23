@@ -30,6 +30,7 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
     const [fixingFileIndex, setFixingFileIndex] = useState<number | null>(null);
     const [isBatchFixing, setIsBatchFixing] = useState(false);
     const [fixedCodes, setFixedCodes] = useState<Record<number, string>>({});
+    const [appliedSuggestions, setAppliedSuggestions] = useState<Record<number, string[]>>({});
     const [downloadNames, setDownloadNames] = useState<Record<number, string>>({});
 
     const toggleSuggestion = (fileIdx: number, sugIdx: number) => {
@@ -63,6 +64,7 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
 
             // Set the fixed code in state for review/copy/download
             setFixedCodes(prev => ({ ...prev, [fileIdx]: response.fixed_code }));
+            setAppliedSuggestions(prev => ({ ...prev, [fileIdx]: suggestionsToApply }));
 
             // Default download name logic
             const parts = filename.split('.');
@@ -114,11 +116,19 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
             const newFixedCodes = { ...fixedCodes };
             const newDownloadNames = { ...downloadNames };
             const newSelectedSuggestions = { ...selectedSuggestions };
+            const newAppliedSuggestions = { ...appliedSuggestions };
 
             response.fixed_files.forEach(ff => {
                 const fileIdx = result.files.findIndex(f => f.filename === ff.filename);
                 if (fileIdx !== -1) {
                     newFixedCodes[fileIdx] = ff.fixed_code;
+
+                    // The batch request object contains the applied suggestions
+                    const req = batchRequests.find(r => r.filename === ff.filename);
+                    if (req) {
+                        newAppliedSuggestions[fileIdx] = req.selected_suggestions;
+                    }
+
                     const parts = ff.filename.split('.');
                     const ext = parts.length > 1 ? parts.pop() : 'txt';
                     newDownloadNames[fileIdx] = `${parts.join('.')}_fixed.${ext}`;
@@ -129,6 +139,7 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
             setFixedCodes(newFixedCodes);
             setDownloadNames(newDownloadNames);
             setSelectedSuggestions(newSelectedSuggestions);
+            setAppliedSuggestions(newAppliedSuggestions);
 
         } catch (err) {
             console.error(err);
@@ -338,51 +349,70 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                                     <motion.div
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        className="mt-6 border border-emerald-200 rounded-xl overflow-hidden shadow-sm"
+                                        className="mt-6 flex flex-col gap-4"
                                     >
-                                        <div className="bg-emerald-50 px-4 py-3 border-b border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                            <h4 className="text-sm font-bold text-emerald-700 flex items-center gap-2">
-                                                <CheckCircle2 className="w-4 h-4" /> Fixed Code Ready
-                                            </h4>
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={downloadNames[idx] || ''}
-                                                    onChange={(e) => setDownloadNames(prev => ({ ...prev, [idx]: e.target.value }))}
-                                                    className="bg-white text-slate-700 text-sm px-3 py-1.5 rounded-lg border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-32 sm:w-auto"
-                                                    placeholder="filename.ext"
-                                                />
-                                                <button
-                                                    onClick={() => {
-                                                        const blob = new Blob([fixedCodes[idx]], { type: 'text/plain' });
-                                                        const url = window.URL.createObjectURL(blob);
-                                                        const a = document.createElement('a');
-                                                        a.href = url;
-                                                        a.download = downloadNames[idx] || 'fixed_code.txt';
-                                                        document.body.appendChild(a);
-                                                        a.click();
-                                                        window.URL.revokeObjectURL(url);
-                                                        document.body.removeChild(a);
-                                                    }}
-                                                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-                                                >
-                                                    <Download className="w-4 h-4" /> <span className="hidden sm:inline">Download</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(fixedCodes[idx]);
-                                                        /* Optional: Add a brief copy success toast here if desired */
-                                                    }}
-                                                    className="flex items-center gap-2 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-700 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-                                                >
-                                                    <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy</span>
-                                                </button>
+                                        {/* Applied Suggestions Summary */}
+                                        {appliedSuggestions[idx] && appliedSuggestions[idx].length > 0 && (
+                                            <div className="bg-indigo-50 rounded-xl p-5 border border-indigo-100 shadow-sm">
+                                                <h4 className="text-sm font-bold tracking-wider text-indigo-700 uppercase flex items-center gap-2 mb-3">
+                                                    <Sparkles className="w-4 h-4" /> Applied Fixes
+                                                </h4>
+                                                <ul className="space-y-2">
+                                                    {appliedSuggestions[idx].map((sug, sIdx) => (
+                                                        <li key={sIdx} className="flex items-start gap-3">
+                                                            <CheckCircle2 className="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" />
+                                                            <span className="text-slate-700 font-medium text-sm leading-relaxed">{sug}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
                                             </div>
-                                        </div>
-                                        <div className="bg-slate-900 p-4 overflow-x-auto max-h-96 overflow-y-auto">
-                                            <pre className="text-sm text-emerald-400 font-mono leading-relaxed">
-                                                <code>{fixedCodes[idx]}</code>
-                                            </pre>
+                                        )}
+
+                                        <div className="border border-emerald-200 rounded-xl overflow-hidden shadow-sm">
+                                            <div className="bg-emerald-50 px-4 py-3 border-b border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                <h4 className="text-sm font-bold text-emerald-700 flex items-center gap-2">
+                                                    <CheckCircle2 className="w-4 h-4" /> Fixed Code Ready
+                                                </h4>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={downloadNames[idx] || ''}
+                                                        onChange={(e) => setDownloadNames(prev => ({ ...prev, [idx]: e.target.value }))}
+                                                        className="bg-white text-slate-700 text-sm px-3 py-1.5 rounded-lg border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-32 sm:w-auto"
+                                                        placeholder="filename.ext"
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            const blob = new Blob([fixedCodes[idx]], { type: 'text/plain' });
+                                                            const url = window.URL.createObjectURL(blob);
+                                                            const a = document.createElement('a');
+                                                            a.href = url;
+                                                            a.download = downloadNames[idx] || 'fixed_code.txt';
+                                                            document.body.appendChild(a);
+                                                            a.click();
+                                                            window.URL.revokeObjectURL(url);
+                                                            document.body.removeChild(a);
+                                                        }}
+                                                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+                                                    >
+                                                        <Download className="w-4 h-4" /> <span className="hidden sm:inline">Download</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(fixedCodes[idx]);
+                                                            /* Optional: Add a brief copy success toast here if desired */
+                                                        }}
+                                                        className="flex items-center gap-2 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-700 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+                                                    >
+                                                        <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="bg-slate-900 p-4 overflow-x-auto max-h-96 overflow-y-auto">
+                                                <pre className="text-sm text-emerald-400 font-mono leading-relaxed">
+                                                    <code>{fixedCodes[idx]}</code>
+                                                </pre>
+                                            </div>
                                         </div>
                                     </motion.div>
                                 )}
