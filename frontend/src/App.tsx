@@ -99,7 +99,7 @@ function App() {
         <ConfigurationPanel />
       </Modal>
 
-      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-10 transition-all">
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-50 transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/ritelogo.png" alt="RITE Logo" className="w-12 h-12 object-contain" />
