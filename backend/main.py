@@ -54,6 +54,9 @@ class CodeAutoFixRequest(BaseModel):
     content: str
     selected_suggestions: List[str]
 
+class CodeAutoFixBatchRequest(BaseModel):
+    files: List[CodeAutoFixRequest]
+
 # Routes
 @app.get("/api/health")
 async def health_check():
@@ -226,6 +229,51 @@ async def auto_fix_code(request: CodeAutoFixRequest, db: AsyncSession = Depends(
         return fixed_result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Code Auto-Fix failed: {str(e)}")
+
+@app.post("/api/auto-fix-code-batch")
+async def auto_fix_code_batch(request: CodeAutoFixBatchRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(AIConnection).where(AIConnection.is_active == True))
+    active_conn = result.scalar_one_or_none()
+    
+    if not active_conn:
+        raise HTTPException(status_code=400, detail="No active AI connection found. Please configure one in Settings.")
+        
+    valid_files = [f for f in request.files if f.selected_suggestions]
+    if not valid_files:
+        return {"fixed_files": [{"filename": f.filename, "fixed_code": f.content} for f in request.files]}
+        
+    provider = active_conn.provider
+    model_name = active_conn.model_name
+    api_key = active_conn.api_key or ""
+
+    try:
+        engine = AIEngine(provider=provider, model_name=model_name, api_key=api_key)
+        
+        # Convert Pydantic objects to dicts for AI Engine
+        files_data = [
+            {
+                "filename": f.filename,
+                "content": f.content,
+                "selected_suggestions": f.selected_suggestions
+            }
+            for f in valid_files
+        ]
+        
+        fixed_result = await engine.auto_fix_code_batch(files_data)
+        
+        # Merge untouched files back into result for a complete response
+        untouched_files = [f for f in request.files if not f.selected_suggestions]
+        if untouched_files:
+            # fixed_result["fixed_files"] will be a list of dicts: {"filename": "xxx", "fixed_code": "yyy"}
+            for f in untouched_files:
+                fixed_result.get("fixed_files", []).append({
+                    "filename": f.filename,
+                    "fixed_code": f.content
+                })
+        
+        return fixed_result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch Code Auto-Fix failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

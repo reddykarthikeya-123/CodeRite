@@ -132,3 +132,21 @@ export const autoFixCode = async (filename: string, content: string, selected_su
   }
   return response.json();
 };
+
+export interface CodeAutoFixBatchRequest {
+  filename: string;
+  content: string;
+  selected_suggestions: string[];
+}
+
+export const autoFixCodeBatch = async (files: CodeAutoFixBatchRequest[]): Promise<{ fixed_files: { filename: string, fixed_code: string }[] }> => {
+  const response = await fetch(`${API_BASE_URL}/auto-fix-code-batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ files }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to batch auto-fix code");
+  }
+  return response.json();
+};

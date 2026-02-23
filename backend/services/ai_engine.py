@@ -22,16 +22,23 @@ class ReviewResponse(BaseModel):
 
 class CodeFileReview(BaseModel):
     filename: str = Field(description="The name of the file being reviewed")
-    score: int = Field(description="Quality score for this specific file from 0 to 100")
-    highlights: List[str] = Field(description="List of specific positive practices or well-written parts found in this file")
-    suggestions: List[str] = Field(description="List of specific, actionable suggestions for this file")
+    score: int = Field(description="Score from 0 to 100 representing code quality")
+    highlights: List[str] = Field(description="List of positive aspects of the code")
+    suggestions: List[str] = Field(description="List of actionable improvements. Must include line numbers.")
 
 class CodeAnalysisResponse_Schema(BaseModel):
-    overall_score: int = Field(description="The overall combined score for all parsed code")
-    files: List[CodeFileReview] = Field(description="The breakdown of reviews per file")
+    overall_score: int = Field(description="Overall percentage score out of 100")
+    files: List[CodeFileReview] = Field(description="Review details for each file")
 
 class CodeAutoFixResponse(BaseModel):
-    fixed_code: str = Field(description="The fully rewritten code incorporating the selected suggestions")
+    fixed_code: str = Field(description="The rewritten source code with suggestions applied")
+
+class FixedCodeFile(BaseModel):
+    filename: str = Field(description="The name of the fixed file")
+    fixed_code: str = Field(description="The rewritten source code")
+
+class CodeAutoFixBatchResponse(BaseModel):
+    fixed_files: List[FixedCodeFile] = Field(description="List of fixed code files")
 
 class AIEngine:
     def __init__(self, provider: str = "ollama", model_name: str = "llama3", api_key: str = None):
@@ -273,4 +280,62 @@ class AIEngine:
             print(f"AI Auto-Fix Error: {e}")
             return {
                 "fixed_code": f"// Error generating fixed code: {str(e)}\n\n" + content
+            }
+
+    async def auto_fix_code_batch(self, files: List[dict]) -> dict:
+        system_prompt = """You are an expert Principal Software Engineer.
+        Your task is to take multiple source code files and rewrite them by applying ONLY the specific improvements requested per file. Do not make unrelated stylistic changes or restructure code unless it is explicitly part of the selected suggestions.
+        
+        CRITICAL INSTRUCTIONS:
+        1. Apply the user's selected suggestions accurately and completely to the source code for each file.
+        2. Verify that the updated code remains valid and runnable.
+        3. Do NOT include markdown code blocks (like ```python) surrounding the code strings in your JSON response. The `fixed_code` values should strictly be raw code.
+
+        You must output a JSON object with the following exact structure:
+        {
+            "fixed_files": [
+                {
+                    "filename": "<original filename>",
+                    "fixed_code": "<the complete rewritten source code>"
+                }
+            ]
+        }
+        """
+        
+        file_payloads = []
+        for f in files:
+            formatted_suggestions = "\n".join([f"- {s}" for s in f.get('selected_suggestions', [])])
+            file_str = f"""
+            Filename: {f['filename']}
+            
+            Selected Suggestions to Apply:
+            {formatted_suggestions}
+            
+            Original Source Code:
+            {f['content']}
+            """
+            file_payloads.append(file_str)
+            
+        user_content = "\n\n---\n\n".join(file_payloads)
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_content)
+        ]
+        
+        fix_parser = JsonOutputParser(pydantic_object=CodeAutoFixBatchResponse)
+        chain = self.llm | fix_parser
+        
+        try:
+            response = await chain.ainvoke(messages)
+            return response
+        except Exception as e:
+            print(f"AI Batch Auto-Fix Error: {e}")
+            return {
+                "fixed_files": [
+                    {
+                        "filename": f["filename"],
+                        "fixed_code": f"// Error generating fixed code: {str(e)}\n\n" + f["content"]
+                    } for f in files
+                ]
             }

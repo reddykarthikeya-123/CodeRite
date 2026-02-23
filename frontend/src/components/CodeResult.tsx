@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, FileCode2, Sparkles, AlertTriangle, Download, Loader2, Copy } from 'lucide-react';
-import { autoFixCode } from '../api';
+import { autoFixCode, autoFixCodeBatch, type CodeAutoFixBatchRequest } from '../api';
 
 export interface CodeAnalysisResponse {
     overall_score: number;
@@ -28,6 +28,7 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
     // Track selected suggestions per file index
     const [selectedSuggestions, setSelectedSuggestions] = useState<Record<number, Set<number>>>({});
     const [fixingFileIndex, setFixingFileIndex] = useState<number | null>(null);
+    const [isBatchFixing, setIsBatchFixing] = useState(false);
     const [fixedCodes, setFixedCodes] = useState<Record<number, string>>({});
     const [downloadNames, setDownloadNames] = useState<Record<number, string>>({});
 
@@ -81,6 +82,59 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
             alert("Failed to auto-fix code. Please check console.");
         } finally {
             setFixingFileIndex(null);
+        }
+    };
+
+    const handleBatchAutoFix = async () => {
+        const batchRequests: CodeAutoFixBatchRequest[] = [];
+
+        for (const [fileIdxStr, selectedIndices] of Object.entries(selectedSuggestions)) {
+            const fileIdx = parseInt(fileIdxStr);
+            if (selectedIndices.size === 0) continue;
+
+            const fileResult = result.files[fileIdx];
+            const rawFile = rawFiles.find(f => f.filename === fileResult.filename);
+            if (!rawFile) continue;
+
+            const suggestionsToApply = Array.from(selectedIndices).map(idx => fileResult.suggestions[idx]);
+
+            batchRequests.push({
+                filename: rawFile.filename,
+                content: rawFile.content,
+                selected_suggestions: suggestionsToApply
+            });
+        }
+
+        if (batchRequests.length === 0) return;
+
+        setIsBatchFixing(true);
+        try {
+            const response = await autoFixCodeBatch(batchRequests);
+
+            const newFixedCodes = { ...fixedCodes };
+            const newDownloadNames = { ...downloadNames };
+            const newSelectedSuggestions = { ...selectedSuggestions };
+
+            response.fixed_files.forEach(ff => {
+                const fileIdx = result.files.findIndex(f => f.filename === ff.filename);
+                if (fileIdx !== -1) {
+                    newFixedCodes[fileIdx] = ff.fixed_code;
+                    const parts = ff.filename.split('.');
+                    const ext = parts.length > 1 ? parts.pop() : 'txt';
+                    newDownloadNames[fileIdx] = `${parts.join('.')}_fixed.${ext}`;
+                    delete newSelectedSuggestions[fileIdx];
+                }
+            });
+
+            setFixedCodes(newFixedCodes);
+            setDownloadNames(newDownloadNames);
+            setSelectedSuggestions(newSelectedSuggestions);
+
+        } catch (err) {
+            console.error(err);
+            alert("Failed to batch auto-fix code. Please check console.");
+        } finally {
+            setIsBatchFixing(false);
         }
     };
 
@@ -144,6 +198,27 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                     </div>
                 </div>
             </motion.div>
+
+            {/* Batch Action Button */}
+            <AnimatePresence>
+                {Object.values(selectedSuggestions).filter(set => set.size > 0).length > 1 && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                        className="flex justify-end -mt-4 mb-4"
+                    >
+                        <button
+                            onClick={handleBatchAutoFix}
+                            disabled={isBatchFixing}
+                            className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed"
+                        >
+                            {isBatchFixing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                            {isBatchFixing ? 'Fixing Selected Files...' : 'Fix All Selected Files'}
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* File Results */}
             <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
