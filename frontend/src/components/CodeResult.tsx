@@ -249,140 +249,144 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                         {/* File Feedback */}
                         <div className="p-6 space-y-6">
 
-                            {/* Highlights Section */}
-                            {file.highlights && file.highlights.length > 0 && (
-                                <div className="space-y-3">
-                                    <h4 className="text-sm font-bold tracking-wider text-emerald-600 uppercase flex items-center gap-2">
-                                        <Sparkles className="w-4 h-4" /> What's Good
-                                    </h4>
-                                    <ul className="space-y-2">
-                                        {file.highlights.map((highlight, hIdx) => (
-                                            <li key={hIdx} className="flex items-start gap-3">
-                                                <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                                                <span className="text-slate-700 leading-relaxed font-medium">{highlight}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
+                            {!fixedCodes[idx] && (
+                                <>
+                                    {/* Highlights Section */}
+                                    {file.highlights && file.highlights.length > 0 && (
+                                        <div className="space-y-3">
+                                            <h4 className="text-sm font-bold tracking-wider text-emerald-600 uppercase flex items-center gap-2">
+                                                <Sparkles className="w-4 h-4" /> What's Good
+                                            </h4>
+                                            <ul className="space-y-2">
+                                                {file.highlights.map((highlight, hIdx) => (
+                                                    <li key={hIdx} className="flex items-start gap-3">
+                                                        <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                                                        <span className="text-slate-700 leading-relaxed font-medium">{highlight}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {/* Suggestions Section */}
+                                    {file.suggestions && file.suggestions.length > 0 ? (
+                                        <div className="space-y-3">
+                                            <h4 className="text-sm font-bold tracking-wider text-amber-600 uppercase flex items-center gap-2">
+                                                <AlertTriangle className="w-4 h-4" /> Areas for Improvement
+                                            </h4>
+                                            <ul className="space-y-2">
+                                                {file.suggestions.map((suggestion, sIdx) => (
+                                                    <li
+                                                        key={sIdx}
+                                                        className="flex items-start gap-4 p-3 rounded-lg border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer group"
+                                                        onClick={() => toggleSuggestion(idx, sIdx)}
+                                                    >
+                                                        <div className="mt-0.5 flex-shrink-0 relative flex items-center justify-center">
+                                                            <div className={`w-5 h-5 rounded flex items-center justify-center border transition-all ${selectedSuggestions[idx]?.has(sIdx)
+                                                                ? 'bg-indigo-600 border-indigo-600'
+                                                                : 'border-slate-300 bg-white group-hover:border-indigo-400'
+                                                                }`}>
+                                                                {selectedSuggestions[idx]?.has(sIdx) && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                                                            </div>
+                                                        </div>
+                                                        <span className={`text-slate-700 leading-relaxed transition-opacity ${selectedSuggestions[idx]?.has(sIdx) ? 'opacity-100 font-medium' : 'opacity-80'}`}>
+                                                            {suggestion}
+                                                        </span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+
+                                            <AnimatePresence>
+                                                {selectedSuggestions[idx] && selectedSuggestions[idx].size > 0 && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, height: 0 }}
+                                                        animate={{ opacity: 1, height: 'auto' }}
+                                                        exit={{ opacity: 0, height: 0 }}
+                                                        className="mt-6 pt-6 border-t border-slate-100 flex justify-between items-center"
+                                                    >
+                                                        <span className="text-sm font-medium text-slate-500">
+                                                            {selectedSuggestions[idx].size} suggestion{selectedSuggestions[idx].size > 1 ? 's' : ''} selected
+                                                        </span>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleAutoFix(idx, file.filename); }}
+                                                            disabled={fixingFileIndex === idx}
+                                                            className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            {fixingFileIndex === idx ? (
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                            ) : (
+                                                                <Sparkles className="w-4 h-4" />
+                                                            )}
+                                                            {fixingFileIndex === idx ? 'Fixing Code...' : 'Auto-Fix Selected'}
+                                                        </button>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-emerald-600 font-medium bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                                            <CheckCircle2 className="w-5 h-5" />
+                                            <span>Code looks extremely great! No specific issues found to improve.</span>
+                                        </div>
+                                    )}
+                                </>
                             )}
 
-                            {/* Suggestions Section */}
-                            {file.suggestions && file.suggestions.length > 0 ? (
-                                <div className="space-y-3">
-                                    <h4 className="text-sm font-bold tracking-wider text-amber-600 uppercase flex items-center gap-2">
-                                        <AlertTriangle className="w-4 h-4" /> Areas for Improvement
-                                    </h4>
-                                    <ul className="space-y-2">
-                                        {file.suggestions.map((suggestion, sIdx) => (
-                                            <li
-                                                key={sIdx}
-                                                className="flex items-start gap-4 p-3 rounded-lg border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer group"
-                                                onClick={() => toggleSuggestion(idx, sIdx)}
-                                            >
-                                                <div className="mt-0.5 flex-shrink-0 relative flex items-center justify-center">
-                                                    <div className={`w-5 h-5 rounded flex items-center justify-center border transition-all ${selectedSuggestions[idx]?.has(sIdx)
-                                                        ? 'bg-indigo-600 border-indigo-600'
-                                                        : 'border-slate-300 bg-white group-hover:border-indigo-400'
-                                                        }`}>
-                                                        {selectedSuggestions[idx]?.has(sIdx) && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
-                                                    </div>
-                                                </div>
-                                                <span className={`text-slate-700 leading-relaxed transition-opacity ${selectedSuggestions[idx]?.has(sIdx) ? 'opacity-100 font-medium' : 'opacity-80'}`}>
-                                                    {suggestion}
-                                                </span>
-                                            </li>
-                                        ))}
-                                    </ul>
-
-                                    <AnimatePresence>
-                                        {selectedSuggestions[idx] && selectedSuggestions[idx].size > 0 && (
-                                            <motion.div
-                                                initial={{ opacity: 0, height: 0 }}
-                                                animate={{ opacity: 1, height: 'auto' }}
-                                                exit={{ opacity: 0, height: 0 }}
-                                                className="mt-6 pt-6 border-t border-slate-100 flex justify-between items-center"
-                                            >
-                                                <span className="text-sm font-medium text-slate-500">
-                                                    {selectedSuggestions[idx].size} suggestion{selectedSuggestions[idx].size > 1 ? 's' : ''} selected
-                                                </span>
+                            {/* Fixed Code Output Container */}
+                            <AnimatePresence>
+                                {fixedCodes[idx] && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="mt-6 border border-emerald-200 rounded-xl overflow-hidden shadow-sm"
+                                    >
+                                        <div className="bg-emerald-50 px-4 py-3 border-b border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                            <h4 className="text-sm font-bold text-emerald-700 flex items-center gap-2">
+                                                <CheckCircle2 className="w-4 h-4" /> Fixed Code Ready
+                                            </h4>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={downloadNames[idx] || ''}
+                                                    onChange={(e) => setDownloadNames(prev => ({ ...prev, [idx]: e.target.value }))}
+                                                    className="bg-white text-slate-700 text-sm px-3 py-1.5 rounded-lg border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-32 sm:w-auto"
+                                                    placeholder="filename.ext"
+                                                />
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); handleAutoFix(idx, file.filename); }}
-                                                    disabled={fixingFileIndex === idx}
-                                                    className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    onClick={() => {
+                                                        const blob = new Blob([fixedCodes[idx]], { type: 'text/plain' });
+                                                        const url = window.URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = downloadNames[idx] || 'fixed_code.txt';
+                                                        document.body.appendChild(a);
+                                                        a.click();
+                                                        window.URL.revokeObjectURL(url);
+                                                        document.body.removeChild(a);
+                                                    }}
+                                                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
                                                 >
-                                                    {fixingFileIndex === idx ? (
-                                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                                    ) : (
-                                                        <Sparkles className="w-4 h-4" />
-                                                    )}
-                                                    {fixingFileIndex === idx ? 'Fixing Code...' : 'Auto-Fix Selected'}
+                                                    <Download className="w-4 h-4" /> <span className="hidden sm:inline">Download</span>
                                                 </button>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-
-                                    {/* Fixed Code Output Container */}
-                                    <AnimatePresence>
-                                        {fixedCodes[idx] && (
-                                            <motion.div
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                className="mt-6 border border-emerald-200 rounded-xl overflow-hidden shadow-sm"
-                                            >
-                                                <div className="bg-emerald-50 px-4 py-3 border-b border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                                    <h4 className="text-sm font-bold text-emerald-700 flex items-center gap-2">
-                                                        <CheckCircle2 className="w-4 h-4" /> Fixed Code Ready
-                                                    </h4>
-                                                    <div className="flex items-center gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={downloadNames[idx] || ''}
-                                                            onChange={(e) => setDownloadNames(prev => ({ ...prev, [idx]: e.target.value }))}
-                                                            className="bg-white text-slate-700 text-sm px-3 py-1.5 rounded-lg border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-32 sm:w-auto"
-                                                            placeholder="filename.ext"
-                                                        />
-                                                        <button
-                                                            onClick={() => {
-                                                                const blob = new Blob([fixedCodes[idx]], { type: 'text/plain' });
-                                                                const url = window.URL.createObjectURL(blob);
-                                                                const a = document.createElement('a');
-                                                                a.href = url;
-                                                                a.download = downloadNames[idx] || 'fixed_code.txt';
-                                                                document.body.appendChild(a);
-                                                                a.click();
-                                                                window.URL.revokeObjectURL(url);
-                                                                document.body.removeChild(a);
-                                                            }}
-                                                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-                                                        >
-                                                            <Download className="w-4 h-4" /> <span className="hidden sm:inline">Download</span>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(fixedCodes[idx]);
-                                                                /* Optional: Add a brief copy success toast here if desired */
-                                                            }}
-                                                            className="flex items-center gap-2 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-700 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-                                                        >
-                                                            <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy</span>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div className="bg-slate-900 p-4 overflow-x-auto max-h-96 overflow-y-auto">
-                                                    <pre className="text-sm text-emerald-400 font-mono leading-relaxed">
-                                                        <code>{fixedCodes[idx]}</code>
-                                                    </pre>
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2 text-emerald-600 font-medium bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                                    <CheckCircle2 className="w-5 h-5" />
-                                    <span>Code looks extremely great! No specific issues found to improve.</span>
-                                </div>
-                            )}
+                                                <button
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(fixedCodes[idx]);
+                                                        /* Optional: Add a brief copy success toast here if desired */
+                                                    }}
+                                                    className="flex items-center gap-2 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-700 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+                                                >
+                                                    <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-900 p-4 overflow-x-auto max-h-96 overflow-y-auto">
+                                            <pre className="text-sm text-emerald-400 font-mono leading-relaxed">
+                                                <code>{fixedCodes[idx]}</code>
+                                            </pre>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </motion.div>
                 ))}
