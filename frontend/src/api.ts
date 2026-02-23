@@ -16,6 +16,16 @@ export interface ReviewResponse {
   rewritten_content?: string;
 }
 
+export interface CodeAnalysisResponse {
+  overall_score: number;
+  files: {
+    filename: string;
+    score: number;
+    highlights: string[];
+    suggestions: string[];
+  }[];
+}
+
 export const fetchConnections = async (): Promise<Connection[]> => {
   const response = await fetch(`${API_BASE_URL}/connections`);
   return response.json();
@@ -96,5 +106,29 @@ export const analyzeDocument = async (text: string, customInstructions: string, 
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error("Analysis failed");
+  return response.json();
+};
+
+export const analyzeCode = async (files: { filename: string, content: string }[]): Promise<CodeAnalysisResponse> => {
+  const response = await fetch(`${API_BASE_URL}/analyze-code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ files }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to analyze code");
+  }
+  return response.json();
+};
+
+export const autoFixCode = async (filename: string, content: string, selected_suggestions: string[]): Promise<{ fixed_code: string }> => {
+  const response = await fetch(`${API_BASE_URL}/auto-fix-code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename, content, selected_suggestions }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to auto-fix code");
+  }
   return response.json();
 };

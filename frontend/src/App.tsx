@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react';
 import { ConfigurationPanel } from './components/ConfigurationPanel';
 import { FileUpload } from './components/FileUpload';
+import { CodeUpload } from './components/CodeUpload';
 import { ReviewResult } from './components/ReviewResult';
+import { CodeResult, type CodeAnalysisResponse } from './components/CodeResult';
 import { Modal } from './components/Modal';
-import { analyzeDocument, type ReviewResponse } from './api';
+import { analyzeDocument, analyzeCode, type ReviewResponse } from './api';
 import { Loader2, Settings, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function App() {
-  const [reviewResult, setReviewResult] = useState<ReviewResponse | null>(null);
+  const [docReviewResult, setDocReviewResult] = useState<ReviewResponse | null>(null);
+  const [codeReviewResult, setCodeReviewResult] = useState<CodeAnalysisResponse | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [currentFile, setCurrentFile] = useState<{ content: string, filename: string } | null>(null);
+  const [rawCodeFiles, setRawCodeFiles] = useState<{ filename: string, content: string }[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [loadingStage, setLoadingStage] = useState(0);
+  const [appMode, setAppMode] = useState<'document' | 'code'>('document');
 
   const loadingStages = [
     "Extracting text and structure...",
@@ -47,12 +52,13 @@ function App() {
 
   const handleFileProcessed = async (content: string, filename: string, category: string, images?: string[]) => {
     setCurrentFile({ content, filename });
-    setReviewResult(null);
+    setDocReviewResult(null);
+    setCodeReviewResult(null);
     setAnalyzing(true);
 
     try {
       const result = await analyzeDocument(content, "", category, images);
-      setReviewResult(result);
+      setDocReviewResult(result);
     } catch (err) {
       console.error(err);
       alert("Analysis failed. Please check the backend and configuration.");
@@ -61,9 +67,29 @@ function App() {
     }
   };
 
+  const handleCodeProcessed = async (files: { filename: string, content: string }[]) => {
+    setCurrentFile({ content: `${files.length} files selected`, filename: files.length === 1 ? files[0].filename : 'Multiple Files' });
+    setRawCodeFiles(files);
+    setDocReviewResult(null);
+    setCodeReviewResult(null);
+    setAnalyzing(true);
+
+    try {
+      const result = await analyzeCode(files);
+      setCodeReviewResult(result);
+    } catch (err) {
+      console.error(err);
+      alert("Code analysis failed. Please check the backend and configuration.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const resetState = () => {
-    setReviewResult(null);
+    setDocReviewResult(null);
+    setCodeReviewResult(null);
     setCurrentFile(null);
+    setRawCodeFiles([]);
   };
 
   return (
@@ -97,7 +123,7 @@ function App() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <AnimatePresence mode="wait">
-          {!currentFile && !analyzing && !reviewResult && (
+          {!currentFile && !analyzing && !docReviewResult && !codeReviewResult && (
             <motion.div
               key="upload"
               initial={{ opacity: 0, y: 20 }}
@@ -107,23 +133,56 @@ function App() {
               className="flex flex-col items-center justify-center py-12 md:py-24"
             >
               {/* Hero Section */}
-              <div className="text-center mb-16 relative">
+              <div className="text-center mb-12 relative flex flex-col items-center">
+
+                {/* App Mode Toggle */}
+                <div className="flex bg-slate-200/50 p-1.5 rounded-full mb-8 relative border border-slate-200 shadow-inner w-72">
+                  <div
+                    className="absolute inset-y-1.5 w-[calc(50%-6px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-in-out"
+                    style={{ transform: `translateX(${appMode === 'code' ? 'calc(100% + 12px)' : '6px'})` }}
+                  />
+                  <button
+                    onClick={() => setAppMode('document')}
+                    className={`flex-1 py-2 text-sm font-bold relative z-10 transition-colors rounded-full ${appMode === 'document' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Document Audit
+                  </button>
+                  <button
+                    onClick={() => setAppMode('code')}
+                    className={`flex-1 py-2 text-sm font-bold relative z-10 transition-colors rounded-full ${appMode === 'code' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Code Review
+                  </button>
+                </div>
+
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none"></div>
                 <h2 className="text-5xl md:text-6xl font-black text-slate-900 mb-8 tracking-tighter relative z-10 leading-[1.1]">
-                  Intelligent Document <br className="hidden md:block" /> Quality Assurance
+                  {appMode === 'document' ? 'Intelligent Document' : 'Automated Code'} <br className="hidden md:block" /> {appMode === 'document' ? 'Quality Assurance' : 'Review & Scoring'}
                 </h2>
-                <p className="text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed relative z-10 font-medium">
-                  Instantly validate functional designs, requirements, and test scripts against strict enterprise compliance frameworks using AI.
+                <p className="text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed relative z-10 font-medium h-14">
+                  {appMode === 'document'
+                    ? 'Instantly validate functional designs, requirements, and test scripts against strict enterprise compliance frameworks using AI.'
+                    : 'Analyze source code for formatting correctness, modularity, error handling, and language-specific best practices.'}
                 </p>
               </div>
 
               <div className="w-full max-w-2xl relative z-10">
-                <FileUpload onFileProcessed={handleFileProcessed} />
+                <AnimatePresence mode="wait">
+                  {appMode === 'document' ? (
+                    <motion.div key="doc-upload" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                      <FileUpload onFileProcessed={handleFileProcessed} />
+                    </motion.div>
+                  ) : (
+                    <motion.div key="code-upload" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                      <CodeUpload onCodeProcessed={handleCodeProcessed} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </motion.div>
           )}
 
-          {(currentFile || analyzing) && !reviewResult && (
+          {(currentFile || analyzing) && !docReviewResult && !codeReviewResult && (
             <motion.div
               key="analyzing"
               initial={{ opacity: 0, scale: 0.95 }}
@@ -167,9 +226,9 @@ function App() {
             </motion.div>
           )}
 
-          {reviewResult && (
+          {docReviewResult && (
             <motion.div
-              key="results"
+              key="doc-results"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="w-full"
@@ -188,7 +247,18 @@ function App() {
                   Review Another Document
                 </button>
               </div>
-              <ReviewResult result={reviewResult} />
+              <ReviewResult result={docReviewResult} />
+            </motion.div>
+          )}
+
+          {codeReviewResult && (
+            <motion.div
+              key="code-results"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full"
+            >
+              <CodeResult result={codeReviewResult} rawFiles={rawCodeFiles} onReset={resetState} />
             </motion.div>
           )}
         </AnimatePresence>

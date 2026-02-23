@@ -40,7 +40,19 @@ class AnalysisRequest(BaseModel):
     text: str
     images: Optional[List[str]] = []
     custom_instructions: Optional[str] = ""
-    document_category: Optional[str] = None
+    document_category: str
+
+class CodeFile(BaseModel):
+    filename: str
+    content: str
+
+class CodeAnalysisRequest(BaseModel):
+    files: List[CodeFile]
+
+class CodeAutoFixRequest(BaseModel):
+    filename: str
+    content: str
+    selected_suggestions: List[str]
 
 # Routes
 @app.get("/api/health")
@@ -169,6 +181,51 @@ async def analyze_document(request: AnalysisRequest, db: AsyncSession = Depends(
         return review_result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+@app.post("/api/analyze-code")
+async def analyze_code(request: CodeAnalysisRequest, db: AsyncSession = Depends(get_db)):
+    # Fetch active connection
+    result = await db.execute(select(AIConnection).where(AIConnection.is_active == True))
+    active_conn = result.scalar_one_or_none()
+    
+    if not active_conn:
+        raise HTTPException(status_code=400, detail="No active AI connection found. Please configure one in Settings.")
+    
+    provider = active_conn.provider
+    model_name = active_conn.model_name
+    api_key = active_conn.api_key or ""
+
+    try:
+        engine = AIEngine(provider=provider, model_name=model_name, api_key=api_key)
+        # Convert Pydantic objects to dicts before passing to the engine
+        files_data = [{"filename": f.filename, "content": f.content} for f in request.files]
+        review_result = await engine.analyze_code(files_data)
+        return review_result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Code Analysis failed: {str(e)}")
+
+@app.post("/api/auto-fix-code")
+async def auto_fix_code(request: CodeAutoFixRequest, db: AsyncSession = Depends(get_db)):
+    # Fetch active connection
+    result = await db.execute(select(AIConnection).where(AIConnection.is_active == True))
+    active_conn = result.scalar_one_or_none()
+    
+    if not active_conn:
+        raise HTTPException(status_code=400, detail="No active AI connection found. Please configure one in Settings.")
+    
+    if not request.selected_suggestions:
+        return {"fixed_code": request.content}
+        
+    provider = active_conn.provider
+    model_name = active_conn.model_name
+    api_key = active_conn.api_key or ""
+
+    try:
+        engine = AIEngine(provider=provider, model_name=model_name, api_key=api_key)
+        fixed_result = await engine.auto_fix_code(request.filename, request.content, request.selected_suggestions)
+        return fixed_result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Code Auto-Fix failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

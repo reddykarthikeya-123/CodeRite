@@ -20,6 +20,19 @@ class ReviewResponse(BaseModel):
     suggestions: List[str] = Field(description="List of specific suggestions for improvement")
     rewritten_content: Optional[str] = Field(description="Optional rewritten content if applicable")
 
+class CodeFileReview(BaseModel):
+    filename: str = Field(description="The name of the file being reviewed")
+    score: int = Field(description="Quality score for this specific file from 0 to 100")
+    highlights: List[str] = Field(description="List of specific positive practices or well-written parts found in this file")
+    suggestions: List[str] = Field(description="List of specific, actionable suggestions for this file")
+
+class CodeAnalysisResponse_Schema(BaseModel):
+    overall_score: int = Field(description="The overall combined score for all parsed code")
+    files: List[CodeFileReview] = Field(description="The breakdown of reviews per file")
+
+class CodeAutoFixResponse(BaseModel):
+    fixed_code: str = Field(description="The fully rewritten code incorporating the selected suggestions")
+
 class AIEngine:
     def __init__(self, provider: str = "ollama", model_name: str = "llama3", api_key: str = None):
         self.provider = provider
@@ -142,4 +155,122 @@ class AIEngine:
                 "checklist": [{"item": "AI Analysis", "status": "Fail", "comment": f"Error: {str(e)}"}],
                 "suggestions": ["Check configuration and try again."],
                 "rewritten_content": ""
+            }
+
+    async def analyze_code(self, files: List[dict]) -> dict:
+        system_prompt = """You are a Principal Software Engineer and an expert Code Reviewer. 
+        Your task is to analyze the provided source code files for formatting correctness, modularity, error handling, performance issues, and language-specific best practices.
+        
+        CRITICAL INSTRUCTIONS:
+        1. Evaluate EVERY file provided in the input.
+        2. Assign a score from 0 to 100 for each file based on its overall quality.
+        3. Provide an array of `highlights` detailing what the code already does well (e.g., "Good use of pure functions", "Excellent error handling").
+        4. Provide an array of specific, actionable `suggestions` for improvement for each file. EVERY suggestion MUST explicitly start with the relevant line number or range it applies to (e.g., "Line 42: Extract repetitive database query..."). If a suggestion applies globally, start with "Global:".
+        5. If a file is perfect, provide an empty array for `suggestions` and give it a score of 100.
+        6. Calculate the `overall_score` as the strict integer average of all the individual file scores.
+        
+        You must output a JSON object with the following exact structure:
+        {{
+            "overall_score": 85,
+            "files": [
+                {{
+                    "filename": "example.py",
+                    "score": 80,
+                    "highlights": [
+                        "Clean and consistent variable naming.",
+                        "Good modular separation of concerns."
+                    ],
+                    "suggestions": [
+                        "Line 12: Use parameterized queries instead of string concatenation to prevent SQL injection.",
+                        "Lines 45-50: Extract the validation logic into a separate modular function.",
+                        "Global: Add file-level docstrings explaining the module's purpose."
+                    ]
+                }}
+            ]
+        }}
+        """
+        
+        # Build the user prompt by concatenating all the files
+        user_content = "Please review the following code files:\n\n"
+        for f in files:
+            user_content += f"=== BEGIN FILE: {f['filename']} ===\n"
+            user_content += f"{f['content']}\n"
+            user_content += f"=== END FILE: {f['filename']} ===\n\n"
+            
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_content)
+        ]
+        
+        code_parser = JsonOutputParser(pydantic_object=CodeAnalysisResponse_Schema)
+        chain = self.llm | code_parser
+        
+        try:
+            response = await chain.ainvoke(messages)
+            
+            # Ensure the overall score calculation is accurate even if the LLM hallucinates the math slightly
+            file_scores = [f.get("score", 0) for f in response.get("files", [])]
+            if len(file_scores) > 0:
+                calculated_average = int(sum(file_scores) / len(file_scores))
+                response["overall_score"] = calculated_average
+            else:
+                response["overall_score"] = 0
+                
+            return response
+        except Exception as e:
+            print(f"AI Code Analysis Error: {e}")
+            return {
+                "overall_score": 0,
+                "files": [
+                    {
+                        "filename": "System Error",
+                        "score": 0,
+                        "highlights": [],
+                        "suggestions": [f"Code analysis failed due to system error: {str(e)}", "Please check your AI connection configuration."]
+                    }
+                ]
+            }
+
+    async def auto_fix_code(self, filename: str, content: str, selected_suggestions: List[str]) -> dict:
+        system_prompt = """You are an expert Principal Software Engineer. 
+        Your task is to take a given piece of source code and rewrite it by applying ONLY the specific improvements requested by the user. Do not make unrelated stylistic changes or restructure code unless it is explicitly part of the selected suggestions.
+        
+        CRITICAL INSTRUCTIONS:
+        1. Apply the user's selected suggestions accurately and completely to the source code.
+        2. Verify that the updated code remains valid and runnable in its respective language.
+        3. Do NOT include markdown code blocks (like ```python) surrounding the code string in your JSON response. The `fixed_code` value should strictly be raw code.
+
+        You must output a JSON object with the following exact structure:
+        {{
+            "fixed_code": "<the complete rewritten source code>"
+        }}
+        """
+        
+        formatted_suggestions = "\n".join([f"- {s}" for s in selected_suggestions])
+        
+        user_content = f"""
+        Filename: {filename}
+        
+        Selected Suggestions to Apply:
+        {formatted_suggestions}
+        
+        Original Source Code:
+        {content}
+        """
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_content)
+        ]
+        
+        fix_parser = JsonOutputParser(pydantic_object=CodeAutoFixResponse)
+        chain = self.llm | fix_parser
+        
+        try:
+            response = await chain.ainvoke(messages)
+            return response
+        except Exception as e:
+            print(f"AI Auto-Fix Error: {e}")
+            return {
+                "fixed_code": f"// Error generating fixed code: {str(e)}\n\n" + content
             }
