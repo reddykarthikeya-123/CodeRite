@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, FileCode2, ChevronRight, Sparkles, AlertTriangle, Download, Loader2, Copy } from 'lucide-react';
+import { CheckCircle2, FileCode2, Sparkles, AlertTriangle, Download, Loader2, Copy } from 'lucide-react';
 import { autoFixCode } from '../api';
 
 export interface CodeAnalysisResponse {

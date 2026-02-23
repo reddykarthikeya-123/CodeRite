@@ -138,8 +138,8 @@ function App() {
                 {/* App Mode Toggle */}
                 <div className="flex bg-slate-200/50 p-1.5 rounded-full mb-8 relative border border-slate-200 shadow-inner w-72">
                   <div
-                    className="absolute inset-y-1.5 w-[calc(50%-6px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-in-out"
-                    style={{ transform: `translateX(${appMode === 'code' ? 'calc(100% + 12px)' : '6px'})` }}
+                    className="absolute inset-y-1.5 left-1.5 w-[calc(50%-6px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-in-out"
+                    style={{ transform: `translateX(${appMode === 'code' ? '100%' : '0'})` }}
                   />
                   <button
                     onClick={() => setAppMode('document')}
