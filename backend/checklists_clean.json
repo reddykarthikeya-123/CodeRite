@@ -3,6 +3,7 @@
     "Business Requirements document",
     "Configuration Document",
     "Functional Design Document",
+    "Technical Design Document",
     "Test Scripts"
   ],
   "data": {
@@ -496,6 +497,68 @@
       {
         "Section": "Review and Approval",
         "ChecklistItem": "Final script is approved and signed off for use in UAT or SIT."
+      }
+    ],
+    "Technical Design Document": [
+      {
+        "Section": "Verify Document Format and Version",
+        "ChecklistItem": "Ensure the Technical Design Document (TRS/TDD) uses the standard project-approved template and includes version control."
+      },
+      {
+        "Section": "Object Overview and Purpose",
+        "ChecklistItem": "Confirm that the document clearly defines the objective of the custom object (e.g., report, interface, extension)."
+      },
+      {
+        "Section": "Component Classification (RICEW)",
+        "ChecklistItem": "The object should be tagged correctly (e.g., R-Report, I-Interface, etc.)"
+      },
+      {
+        "Section": "Technical Architecture Diagram",
+        "ChecklistItem": "Diagrams (if applicable) showing data flow, integrations (OIC, REST, SOAP) , and dependencies."
+      },
+      {
+        "Section": "Extensions (VBCS )",
+        "ChecklistItem": "UI extensions with VBCS documented"
+      },
+      {
+        "Section": "Detailed Logic and SQLs",
+        "ChecklistItem": "The document should contain pseudocode or SQL logic, validations, joins, and conditions."
+      },
+      {
+        "Section": "Table/Field Usage",
+        "ChecklistItem": "List of tables used, field-level mappings, and any DDL (for custom tables/views)."
+      },
+      {
+        "Section": "Parameter and Layout Definitions",
+        "ChecklistItem": "For reports/concurrent programs, confirm parameters and output formats are defined."
+      },
+      {
+        "Section": "Error Handling Strategy",
+        "ChecklistItem": "Explanation of how exceptions and failures will be managed (logs, alerts, retries)."
+      },
+      {
+        "Section": "Security & Access Control",
+        "ChecklistItem": "Ensure user roles, data security, and masking (e.g., PII) are considered. VBCS Security model for extensions aligned with Fusion roles"
+      },
+      {
+        "Section": "Performance Considerations",
+        "ChecklistItem": "Index usage, expected volumes, tuning tips, and long-running query identification."
+      },
+      {
+        "Section": "Migration/Deployment Details",
+        "ChecklistItem": "File names, script execution order, and any required configuration setup."
+      },
+      {
+        "Section": "Review and Sign-off",
+        "ChecklistItem": "Confirm that the design has been peer-reviewed and signed off by the Tech Lead."
+      },
+      {
+        "Section": "Assign Reviewer with Relevant Expertise",
+        "ChecklistItem": "Peer reviewer should be selected based on module/domain knowledge (e.g., SCM, FIN, HCM)."
+      },
+      {
+        "Section": "Conduct Review Before QA Submission",
+        "ChecklistItem": "Peer review must happen before formal QA review is initiated."
       }
     ]
   }
