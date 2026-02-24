@@ -172,7 +172,7 @@ class AIEngine:
         1. Evaluate EVERY file provided in the input.
         2. Assign a score from 0 to 100 for each file based on its overall quality.
         3. Provide an array of `highlights` detailing what the code already does well (e.g., "Good use of pure functions", "Excellent error handling").
-        4. Provide an array of specific, actionable `suggestions` for improvement for each file. EVERY suggestion MUST explicitly start with the relevant line number or range it applies to (e.g., "Line 42: Extract repetitive database query..."). If a suggestion applies globally, start with "Global:".
+        4. Provide an array of specific, actionable `suggestions` for improvement for each file. EVERY suggestion MUST explicitly start with the relevant line number or range it applies to, using the exact line numbers provided in the input prompt (e.g., "Line 42: Extract repetitive database query..."). If a suggestion applies globally, start with "Global:".
         5. If a file is perfect, provide an empty array for `suggestions` and give it a score of 100.
         6. Calculate the `overall_score` as the strict integer average of all the individual file scores.
         
@@ -197,11 +197,12 @@ class AIEngine:
         }}
         """
         
-        # Build the user prompt by concatenating all the files
-        user_content = "Please review the following code files:\n\n"
+        # Build the user prompt by concatenating all the files, injecting line numbers
+        user_content = "Please review the following code files. Note that each line of code is prefixed with its line number (format: 'line_number | code'):\n\n"
         for f in files:
+            content_with_lines = "\n".join(f"{i+1} | {line}" for i, line in enumerate(f['content'].split('\n')))
             user_content += f"=== BEGIN FILE: {f['filename']} ===\n"
-            user_content += f"{f['content']}\n"
+            user_content += f"{content_with_lines}\n"
             user_content += f"=== END FILE: {f['filename']} ===\n\n"
             
         messages = [
