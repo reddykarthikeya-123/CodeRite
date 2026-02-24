@@ -1,5 +1,6 @@
 from fastapi import UploadFile, HTTPException
 from pypdf import PdfReader
+import pdfplumber
 from docx import Document
 from pptx import Presentation
 import io
@@ -45,13 +46,28 @@ async def parse_file(file: UploadFile) -> dict:
 async def _parse_pdf(file: UploadFile) -> tuple[str, list]:
     content = await file.read()
     
-    # Text extraction via pypdf
-    reader = PdfReader(io.BytesIO(content))
     text = ""
-    for page in reader.pages:
-        extracted = page.extract_text()
-        if extracted:
-            text += extracted + "\n"
+    
+    # Text and Table extraction via pdfplumber (MIT Licensed, excellent layout parsing)
+    with pdfplumber.open(io.BytesIO(content)) as pdf:
+        for i, page in enumerate(pdf.pages):
+            # 1. Extract raw text with spatial layout preservation
+            # layout=True maintains visual columns and spaces
+            page_text = page.extract_text(layout=True)
+            if page_text:
+                text += f"\n--- Page {i+1} Text ---\n{page_text}\n"
+            
+            # 2. Extract tables accurately as Markdown
+            tables = page.extract_tables()
+            if tables:
+                text += f"\n--- Page {i+1} Tables ---\n"
+                for table_idx, table in enumerate(tables):
+                    text += f"Table {table_idx + 1}:\n"
+                    for row in table:
+                        # Clean up None values that pdfplumber returns for empty cells
+                        cleaned_row = [str(cell).replace("\n", " ").strip() if cell is not None else "" for cell in row]
+                        text += "| " + " | ".join(cleaned_row) + " |\n"
+                    text += "\n"
     
     base64_images = []
     
