@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, FileCode2, Sparkles, AlertTriangle, Download, Loader2, Copy } from 'lucide-react';
+import { CheckCircle2, FileCode2, Sparkles, AlertTriangle, Download, Loader2, Copy, FileText, GitCompare } from 'lucide-react';
 import { autoFixCode, autoFixCodeBatch, type CodeAutoFixBatchRequest } from '../api';
+import ReactDiffViewer from 'react-diff-viewer-continued';
 
 export interface CodeAnalysisResponse {
     overall_score: number;
@@ -32,6 +33,8 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
     const [fixedCodes, setFixedCodes] = useState<Record<number, string>>({});
     const [appliedSuggestions, setAppliedSuggestions] = useState<Record<number, string[]>>({});
     const [downloadNames, setDownloadNames] = useState<Record<number, string>>({});
+    const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+    const [showDiff, setShowDiff] = useState<Record<number, boolean>>({});
 
     const toggleSuggestion = (fileIdx: number, sugIdx: number) => {
         setSelectedSuggestions(prev => {
@@ -370,9 +373,34 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
 
                                         <div className="border border-emerald-200 rounded-xl overflow-hidden shadow-sm">
                                             <div className="bg-emerald-50 px-4 py-3 border-b border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                                <h4 className="text-sm font-bold text-emerald-700 flex items-center gap-2">
-                                                    <CheckCircle2 className="w-4 h-4" /> Fixed Code Ready
-                                                </h4>
+                                                <div className="flex items-center gap-3">
+                                                    <h4 className="text-sm font-bold text-emerald-700 flex items-center gap-2">
+                                                        <CheckCircle2 className="w-4 h-4" /> Fixed Code Ready
+                                                    </h4>
+
+                                                    {/* View Toggle */}
+                                                    <div className="flex bg-emerald-100/50 rounded-lg p-0.5 border border-emerald-200 ml-2">
+                                                        <button
+                                                            onClick={() => setShowDiff(prev => ({ ...prev, [idx]: false }))}
+                                                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${!showDiff[idx]
+                                                                    ? 'bg-white text-emerald-700 shadow-sm'
+                                                                    : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50'
+                                                                }`}
+                                                        >
+                                                            <FileText className="w-3.5 h-3.5" /> Source Code
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setShowDiff(prev => ({ ...prev, [idx]: true }))}
+                                                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${showDiff[idx]
+                                                                    ? 'bg-white text-emerald-700 shadow-sm'
+                                                                    : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50'
+                                                                }`}
+                                                        >
+                                                            <GitCompare className="w-3.5 h-3.5" /> Diff View
+                                                        </button>
+                                                    </div>
+                                                </div>
+
                                                 <div className="flex items-center gap-2">
                                                     <input
                                                         type="text"
@@ -398,21 +426,83 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                                                         <Download className="w-4 h-4" /> <span className="hidden sm:inline">Download</span>
                                                     </button>
                                                     <button
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(fixedCodes[idx]);
-                                                            /* Optional: Add a brief copy success toast here if desired */
+                                                        onClick={async () => {
+                                                            try {
+                                                                await navigator.clipboard.writeText(fixedCodes[idx]);
+                                                                setCopiedIndex(idx);
+                                                                setTimeout(() => setCopiedIndex(null), 2000);
+                                                            } catch (err) {
+                                                                console.error("Failed to copy!", err);
+                                                            }
                                                         }}
-                                                        className="flex items-center gap-2 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-700 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+                                                        className={`flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors border ${copiedIndex === idx
+                                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                                                                : 'bg-white border-emerald-300 hover:bg-emerald-100 text-emerald-700'
+                                                            }`}
                                                     >
-                                                        <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy</span>
+                                                        {copiedIndex === idx ? (
+                                                            <>
+                                                                <CheckCircle2 className="w-4 h-4" /> <span className="hidden sm:inline">Copied!</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Copy className="w-4 h-4" /> <span className="hidden sm:inline">Copy</span>
+                                                            </>
+                                                        )}
                                                     </button>
                                                 </div>
                                             </div>
-                                            <div className="bg-slate-900 p-4 overflow-x-auto max-h-96 overflow-y-auto">
-                                                <pre className="text-sm text-emerald-400 font-mono leading-relaxed">
-                                                    <code>{fixedCodes[idx]}</code>
-                                                </pre>
-                                            </div>
+
+                                            {showDiff[idx] ? (
+                                                <div className="w-full overflow-x-auto bg-white">
+                                                    <ReactDiffViewer
+                                                        oldValue={rawFiles.find(f => f.filename === file.filename)?.content || ''}
+                                                        newValue={fixedCodes[idx]}
+                                                        splitView={true}
+                                                        hideLineNumbers={false}
+                                                        useDarkTheme={false}
+                                                        styles={{
+                                                            variables: {
+                                                                light: {
+                                                                    diffViewerBackground: '#fff',
+                                                                    diffViewerColor: '#334155',
+                                                                    addedBackground: '#ecfdf5',
+                                                                    addedColor: '#065f46',
+                                                                    removedBackground: '#fef2f2',
+                                                                    removedColor: '#991b1b',
+                                                                    wordAddedBackground: '#a7f3d0',
+                                                                    wordRemovedBackground: '#fecaca',
+                                                                    addedGutterBackground: '#d1fae5',
+                                                                    removedGutterBackground: '#fee2e2',
+                                                                    gutterBackground: '#f8fafc',
+                                                                    gutterBackgroundDark: '#f1f5f9',
+                                                                    highlightBackground: '#f0f9ff',
+                                                                    highlightGutterBackground: '#e0f2fe',
+                                                                    codeFoldGutterBackground: '#f8fafc',
+                                                                    codeFoldBackground: '#f8fafc',
+                                                                    emptyLineBackground: '#fff',
+                                                                    gutterColor: '#94a3b8',
+                                                                    addedGutterColor: '#059669',
+                                                                    removedGutterColor: '#dc2626',
+                                                                }
+                                                            },
+                                                            line: {
+                                                                fontSize: '13px',
+                                                                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                                                            },
+                                                            content: {
+                                                                padding: '16px',
+                                                            }
+                                                        }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="bg-slate-900 p-4 overflow-x-auto max-h-[600px] overflow-y-auto">
+                                                    <pre className="text-sm text-emerald-400 font-mono leading-relaxed select-all" tabIndex={0}>
+                                                        <code>{fixedCodes[idx]}</code>
+                                                    </pre>
+                                                </div>
+                                            )}
                                         </div>
                                     </motion.div>
                                 )}
