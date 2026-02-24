@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 
-DATABASE_URL = "postgresql+asyncpg://postgres:1234@localhost:5432/CodeRite"
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:1234@localhost:5432/CodeRite")
 
 engine = create_async_engine(DATABASE_URL, echo=True)
 

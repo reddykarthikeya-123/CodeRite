@@ -55,7 +55,8 @@ class AIEngine:
             return ChatOpenAI(model=self.model_name, api_key=self.api_key, temperature=0.0)
         elif self.provider == "ollama":
              # Assuming default Ollama URL
-            return ChatOllama(model=self.model_name, base_url="http://localhost:11434", temperature=0.0)
+            ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            return ChatOllama(model=self.model_name, base_url=ollama_url, temperature=0.0)
         elif self.provider == "gemini":
             if not self.api_key:
                 raise ValueError("Google Gemini API Key is required")
