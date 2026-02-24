@@ -1,10 +1,17 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+load_dotenv()
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional
 from pydantic import BaseModel
 import json
+import shutil
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(message)s")
+logger = logging.getLogger(__name__)
 
 from database import engine, Base, get_db
 from models import DocumentReview, AIConnection
@@ -28,6 +35,20 @@ app.add_middleware(
 async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+    logger.info("--- Checking System Dependencies ---")
+    tesseract_path = shutil.which("tesseract")
+    if tesseract_path:
+        logger.info(f"✅ Tesseract OCR found at: {tesseract_path}")
+    else:
+        logger.warning("❌ Tesseract OCR not found! Image text extraction will fail. (Hint: sudo apt install tesseract-ocr)")
+
+    poppler_path = shutil.which("pdftoppm")
+    if poppler_path:
+        logger.info(f"✅ Poppler utils found at: {poppler_path}")
+    else:
+        logger.warning("❌ Poppler utils not found! PDF to Image conversion will fail. (Hint: sudo apt install poppler-utils)")
+    logger.info("------------------------------------")
 
 # Pydantic Models for Requests
 class ConnectionCreate(BaseModel):
