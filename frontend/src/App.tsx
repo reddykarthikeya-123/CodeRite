@@ -109,14 +109,16 @@ function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-200 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
-              title="Settings (Cmd/Ctrl + ,)"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Settings</span>
-            </button>
+            {import.meta.env.VITE_HIDE_SETTINGS_BUTTON !== 'true' && (
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-200 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                title="Settings (Cmd/Ctrl + ,)"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
