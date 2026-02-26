@@ -36,6 +36,16 @@ async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         
+    import os
+    import platform
+    # Auto-inject paths for Windows local execution without terminal restart
+    if platform.system() == "Windows":
+        win_path = os.environ.get("PATH", "")
+        if "Tesseract-OCR" not in win_path:
+            os.environ["PATH"] += r";C:\Program Files\Tesseract-OCR"
+        if "poppler" not in win_path:
+            os.environ["PATH"] += r";C:\poppler\poppler-24.08.0\Library\bin"
+        
     logger.info("--- Checking System Dependencies ---")
     tesseract_path = shutil.which("tesseract")
     if tesseract_path:
@@ -182,9 +192,9 @@ async def upload_file(file: UploadFile = File(...)):
 
 @app.post("/api/analyze")
 async def analyze_document(request: AnalysisRequest, db: AsyncSession = Depends(get_db)):
-    # Fetch active connection
+    # Fetch active connection safely handling multiple
     result = await db.execute(select(AIConnection).where(AIConnection.is_active == True))
-    active_conn = result.scalar_one_or_none()
+    active_conn = result.scalars().first()
     
     if not active_conn:
         raise HTTPException(status_code=400, detail="No active AI connection found. Please configure one in Settings.")
@@ -208,9 +218,9 @@ async def analyze_document(request: AnalysisRequest, db: AsyncSession = Depends(
 
 @app.post("/api/analyze-code")
 async def analyze_code(request: CodeAnalysisRequest, db: AsyncSession = Depends(get_db)):
-    # Fetch active connection
+    # Fetch active connection safely handling multiple
     result = await db.execute(select(AIConnection).where(AIConnection.is_active == True))
-    active_conn = result.scalar_one_or_none()
+    active_conn = result.scalars().first()
     
     if not active_conn:
         raise HTTPException(status_code=400, detail="No active AI connection found. Please configure one in Settings.")
@@ -230,9 +240,9 @@ async def analyze_code(request: CodeAnalysisRequest, db: AsyncSession = Depends(
 
 @app.post("/api/auto-fix-code")
 async def auto_fix_code(request: CodeAutoFixRequest, db: AsyncSession = Depends(get_db)):
-    # Fetch active connection
+    # Fetch active connection safely handling multiple
     result = await db.execute(select(AIConnection).where(AIConnection.is_active == True))
-    active_conn = result.scalar_one_or_none()
+    active_conn = result.scalars().first()
     
     if not active_conn:
         raise HTTPException(status_code=400, detail="No active AI connection found. Please configure one in Settings.")
@@ -254,7 +264,7 @@ async def auto_fix_code(request: CodeAutoFixRequest, db: AsyncSession = Depends(
 @app.post("/api/auto-fix-code-batch")
 async def auto_fix_code_batch(request: CodeAutoFixBatchRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AIConnection).where(AIConnection.is_active == True))
-    active_conn = result.scalar_one_or_none()
+    active_conn = result.scalars().first()
     
     if not active_conn:
         raise HTTPException(status_code=400, detail="No active AI connection found. Please configure one in Settings.")

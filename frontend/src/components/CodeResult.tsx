@@ -383,8 +383,8 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                                                         <button
                                                             onClick={() => setShowDiff(prev => ({ ...prev, [idx]: false }))}
                                                             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${!showDiff[idx]
-                                                                    ? 'bg-white text-emerald-700 shadow-sm'
-                                                                    : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50'
+                                                                ? 'bg-white text-emerald-700 shadow-sm'
+                                                                : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50'
                                                                 }`}
                                                         >
                                                             <FileText className="w-3.5 h-3.5" /> Source Code
@@ -392,8 +392,8 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                                                         <button
                                                             onClick={() => setShowDiff(prev => ({ ...prev, [idx]: true }))}
                                                             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${showDiff[idx]
-                                                                    ? 'bg-white text-emerald-700 shadow-sm'
-                                                                    : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50'
+                                                                ? 'bg-white text-emerald-700 shadow-sm'
+                                                                : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50'
                                                                 }`}
                                                         >
                                                             <GitCompare className="w-3.5 h-3.5" /> Diff View
@@ -436,8 +436,8 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                                                             }
                                                         }}
                                                         className={`flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors border ${copiedIndex === idx
-                                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
-                                                                : 'bg-white border-emerald-300 hover:bg-emerald-100 text-emerald-700'
+                                                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                                                            : 'bg-white border-emerald-300 hover:bg-emerald-100 text-emerald-700'
                                                             }`}
                                                     >
                                                         {copiedIndex === idx ? (
@@ -458,32 +458,32 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                                                     <ReactDiffViewer
                                                         oldValue={rawFiles.find(f => f.filename === file.filename)?.content || ''}
                                                         newValue={fixedCodes[idx]}
-                                                        splitView={true}
+                                                        splitView={false}
                                                         hideLineNumbers={false}
-                                                        useDarkTheme={false}
+                                                        useDarkTheme={true}
                                                         styles={{
                                                             variables: {
-                                                                light: {
-                                                                    diffViewerBackground: '#fff',
-                                                                    diffViewerColor: '#334155',
-                                                                    addedBackground: '#ecfdf5',
-                                                                    addedColor: '#065f46',
-                                                                    removedBackground: '#fef2f2',
-                                                                    removedColor: '#991b1b',
-                                                                    wordAddedBackground: '#a7f3d0',
-                                                                    wordRemovedBackground: '#fecaca',
-                                                                    addedGutterBackground: '#d1fae5',
-                                                                    removedGutterBackground: '#fee2e2',
-                                                                    gutterBackground: '#f8fafc',
-                                                                    gutterBackgroundDark: '#f1f5f9',
-                                                                    highlightBackground: '#f0f9ff',
-                                                                    highlightGutterBackground: '#e0f2fe',
-                                                                    codeFoldGutterBackground: '#f8fafc',
-                                                                    codeFoldBackground: '#f8fafc',
-                                                                    emptyLineBackground: '#fff',
-                                                                    gutterColor: '#94a3b8',
-                                                                    addedGutterColor: '#059669',
-                                                                    removedGutterColor: '#dc2626',
+                                                                dark: {
+                                                                    diffViewerBackground: '#0f172a', // slate-900
+                                                                    diffViewerColor: '#34d399',      // emerald-400
+                                                                    addedBackground: '#022c22',      // emerald-950
+                                                                    addedColor: '#34d399',           // emerald-400
+                                                                    removedBackground: '#450a0a',    // red-950
+                                                                    removedColor: '#f87171',         // red-400
+                                                                    wordAddedBackground: '#064e3b',  // emerald-900
+                                                                    wordRemovedBackground: '#7f1d1d',// red-900
+                                                                    addedGutterBackground: '#022c22',
+                                                                    removedGutterBackground: '#450a0a',
+                                                                    gutterBackground: '#1e293b',     // slate-800
+                                                                    gutterBackgroundDark: '#0f172a',
+                                                                    highlightBackground: '#1e293b',
+                                                                    highlightGutterBackground: '#1e293b',
+                                                                    codeFoldGutterBackground: '#1e293b',
+                                                                    codeFoldBackground: '#1e293b',
+                                                                    emptyLineBackground: '#0f172a',
+                                                                    gutterColor: '#475569',          // slate-600
+                                                                    addedGutterColor: '#10b981',     // emerald-500
+                                                                    removedGutterColor: '#ef4444',   // red-500
                                                                 }
                                                             },
                                                             line: {

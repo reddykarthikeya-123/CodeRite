@@ -104,7 +104,7 @@ function App() {
           <div className="flex items-center gap-3">
             <img src="/ritelogo.png" alt="RITE Logo" className="w-12 h-12 object-contain" />
             <h1 className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-900 tracking-tight">
-              CodeRite Auditor
+              Inspectra AI
             </h1>
           </div>
 

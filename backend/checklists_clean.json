@@ -4,7 +4,9 @@
     "Configuration Document",
     "Functional Design Document",
     "Technical Design Document",
-    "Test Scripts"
+    "Test Scripts",
+    "SOW Document",
+    "Test Plan"
   ],
   "data": {
     "Business Requirements document": [
@@ -559,6 +561,122 @@
       {
         "Section": "Conduct Review Before QA Submission",
         "ChecklistItem": "Peer review must happen before formal QA review is initiated."
+      }
+    ],
+    "SOW Document": [
+      {
+        "Section": "Entity Name",
+        "ChecklistItem": "Incase the currency is in INR, the Signing Entity should be RITE Softwrare Pvt Ltd."
+      },
+      {
+        "Section": "Reference to MSA/ NDA",
+        "ChecklistItem": "1st paragraph of SOW must refer to the MSA document (with the date when MSA is exceuted)."
+      },
+      {
+        "Section": "SOW Effective Dates & Disclaimer on MSA clauses",
+        "ChecklistItem": "2nd Paragraph to refer SOW with Effective date and standard clause"
+      },
+      {
+        "Section": "Overview",
+        "ChecklistItem": "This section explains about\n1. \"What client is expecting from RITE?\"\n2. The business Requirement/ Problem the SOW is going to address"
+      },
+      {
+        "Section": "Scope of work",
+        "ChecklistItem": "Clearly mention the Line level scope details.\nIf SOW covers Functiona/ Technical tasks, keep the details separate sub-sections.\nMention the Activities/ Roles by each Track\nIncase the details are huge (like # of Reports, Data Migration components, Test script details etc.) -- Mention all of them in APPENDIX (at the End of SOW) and Reference to that from SCOPE section.\n\nIncase of T&M, mention the Technologies/ Modules the Resource is going to work on"
+      },
+      {
+        "Section": "Deliverables",
+        "ChecklistItem": "Mention the list of deliverables that we produce as part of the assignment.\nDo not over commit.\n\nIncase of T&M, mention the Technologies/ Modules the Resource is going to work on."
+      },
+      {
+        "Section": "Assumptions",
+        "ChecklistItem": "Clearly list down the General, Technical Assumptions. The list should include (not limited to) -- Involvement of client team (for requirements clarifications/ timely signoffs/ coordination with other partners etc.), Access/Privileges/ Connectivity details etc."
+      },
+      {
+        "Section": "Execution Approach",
+        "ChecklistItem": "Mention the Project approach (whether Waterfall model/ Sprint)\nDetail out the Milestones by Dates and Acceptance criterion.\nPrefer to have Entry & Exit criterion for each Stage"
+      },
+      {
+        "Section": "Team Structure",
+        "ChecklistItem": "List down the Role (NOT NAMES), Location (ONSITE/OFFSHORE/NEARSHORE), Role-Responsibilities."
+      },
+      {
+        "Section": "Duration of Services",
+        "ChecklistItem": "Should have Start Date & End Date"
+      },
+      {
+        "Section": "Out of Scope",
+        "ChecklistItem": "Incase no content, mention Standard Clause \" Any Activities or Deliverables NOT LISTED in SCOPE/ Deliverable Section\""
+      },
+      {
+        "Section": "Pre-Requisites",
+        "ChecklistItem": "List down the details that Client need to keep it Ready before we start the assignment. These kind of overlap with Assumptions."
+      },
+      {
+        "Section": "Commercials/ Fee Schedule",
+        "ChecklistItem": "1. If its Fixed Price --List the Milestone Description, Date, Amount. DO NOT SHARE RATES BY EACH RESOURCE, # of Resources & # of Months.\nWhile listing the Milestones-- keep CASHFLOW in mind. i.e. Should have Milestones at Regular intervals (monthly or bi-monthly). Should not be only 1 milestone at the end of assignment\n2. T&M -- Monthly Billing Amount (Mention by Each Role Wise, Hour Rate, # of Hours/Month, Monthly Bill Amount)."
+      },
+      {
+        "Section": "Contact / Escalation Matrix",
+        "ChecklistItem": "1. Tabular format for Contact Details of Management from both sides (RITE and CLIENT).\n2. Should have two Rows at minimum--- Project Managers, 1st Level of Escalation.\n3. Recommended to include Communication Schedule as well (Weekly Connect/ Daily Connect etc.)"
+      },
+      {
+        "Section": "Payment Terms",
+        "ChecklistItem": "Recommended is 30 Days."
+      },
+      {
+        "Section": "Signing Authority",
+        "ChecklistItem": "Depends on SOW Signing Entity, Signatury Names to be present."
+      }
+    ],
+    "Test Plan": [
+      {
+        "Section": "Project Overview",
+        "ChecklistItem": "Project name, scope, Oracle Fusion modules list, implementation type."
+      },
+      {
+        "Section": "Testing Scope",
+        "ChecklistItem": "SIT, UAT, Regression, OIC Testing, RICEW validation, Quarterly Patch Testing."
+      },
+      {
+        "Section": "Modules in Scope",
+        "ChecklistItem": "HCM, Finance, SCM, PPM, Procurement, Payroll, OTM, as applicable."
+      },
+      {
+        "Section": "Test Objectives",
+        "ChecklistItem": "Validate configurations, integrations, workflows, security roles, reports, conversions."
+      },
+      {
+        "Section": "Test Deliverables",
+        "ChecklistItem": "Test Plan, Test Scenarios, Test Cases, RTM, Daily Status Reports, Test Summary Report."
+      },
+      {
+        "Section": "Test Environments",
+        "ChecklistItem": "SIT, UAT, PRE-PROD, PROD, including P2T/P3T refresh details."
+      },
+      {
+        "Section": "Entry Criteria",
+        "ChecklistItem": "Approved BRD/MD50, configurations completed, test data ready, environment provisioned."
+      },
+      {
+        "Section": "Exit Criteria",
+        "ChecklistItem": "All critical tests passed, major defects closed or accepted, UAT sign-off received."
+      },
+      {
+        "Section": "Test Approach",
+        "ChecklistItem": "Manual and Automation testing, OIC validations, RICEW testing, workflow validation, E2E testing."
+      },
+      {
+        "Section": "Roles & Responsibilities",
+        "ChecklistItem": "QA Manager, Test Lead, Module Testers, Integration Testers, Automation Engineers, SMEs, Oracle Consultants."
+      },
+      {
+        "Section": "Risks & Mitigations",
+        "ChecklistItem": "Environment delays, data issues, dependency on integrations, lack of SME availability."
+      },
+      {
+        "Section": "Testing Timeline",
+        "ChecklistItem": "SIT/UAT cycles, execution windows, major milestones, test cycle duration."
       }
     ]
   }

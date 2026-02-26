@@ -1,6 +1,6 @@
-# CodeRite Auditor - Production Deployment Guide
+# Inspectra AI - Production Deployment Guide
 
-This guide provides end-to-end instructions for deploying the CodeRite Document Review & Scoring Application on Linux Server(s).
+This guide provides end-to-end instructions for deploying the Inspectra AI Document Review & Scoring Application on Linux Server(s).
 
 ## Table of Contents
 1. [Prerequisites & System Setup](#1-prerequisites--system-setup)
@@ -117,6 +117,9 @@ server {
     listen 80;
     server_name <your-domain-or-ip>;
 
+    # Allow large document uploads (Apply to entire server block)
+    client_max_body_size 50M;
+
     # Serve the static React application
     location / {
         root /var/www/coderite/frontend/dist;
@@ -132,8 +135,6 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         
-        # Important for large document uploads
-        client_max_body_size 50M;
         proxy_read_timeout 300s;
         proxy_connect_timeout 300s;
     }
@@ -159,7 +160,7 @@ sudo nano /etc/systemd/system/coderite-backend.service
 
 ```ini
 [Unit]
-Description=Gunicorn daemon for CodeRite API
+Description=Gunicorn daemon for Inspectra AI API
 After=network.target
 
 [Service]
@@ -167,7 +168,7 @@ User=ubuntu
 Group=www-data
 WorkingDirectory=/var/www/coderite/backend
 Environment="PATH=/var/www/coderite/backend/venv/bin"
-ExecStart=/var/www/coderite/backend/venv/bin/gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000
+ExecStart=/var/www/coderite/backend/venv/bin/gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 --timeout 300
 
 [Install]
 WantedBy=multi-user.target
@@ -181,4 +182,4 @@ sudo systemctl status coderite-backend
 ```
 
 ### ✅ Deployment Complete
-You can now access the CodeRite platform by navigating to your domain or server IP in a web browser.
+You can now access the Inspectra AI platform by navigating to your domain or server IP in a web browser.

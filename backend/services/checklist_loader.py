@@ -19,10 +19,13 @@ class ChecklistLoader:
             return {"sheets": [], "data": {}}
 
     def get_categories(self) -> list:
-        return self.checklists.get("sheets", [])
+        # Load dynamically so changes to JSON are reflected without restart
+        checklists = self._load()
+        return checklists.get("sheets", [])
 
     def get_checklist_for_category(self, category: str) -> list:
-        return self.checklists.get("data", {}).get(category, [])
+        checklists = self._load()
+        return checklists.get("data", {}).get(category, [])
 
 # Singleton instance
 loader = ChecklistLoader()
