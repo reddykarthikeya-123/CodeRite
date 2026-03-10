@@ -15,9 +15,13 @@ class ChecklistItem(BaseModel):
     status: str = Field(description="Status of the item: Pass, Fail, or Warning")
     comment: str = Field(description="Comment explaining the status")
 
+class SuggestionItem(BaseModel):
+    type: str = Field(description="Type of suggestion: Fail or Warning")
+    text: str = Field(description="The actionable recommendation")
+
 class ReviewResponse(BaseModel):
     checklist: List[ChecklistItem] = Field(description="List of checklist items reviewed")
-    suggestions: List[str] = Field(description="List of specific suggestions for improvement")
+    suggestions: List[SuggestionItem] = Field(description="List of specific suggestions for improvement")
     rewritten_content: Optional[str] = Field(description="Optional rewritten content if applicable")
 
 class CodeFileReview(BaseModel):
@@ -89,16 +93,19 @@ class AIEngine:
         You must evaluate *every single item* in the target checklist.
         
         CRITICAL INSTRUCTIONS FOR COMMENTS & SUGGESTIONS:
-        1. For EVERY item marked "Fail" or "Warning", provide a specific, actionable recommendation in the "suggestions" array on how to fix it. Do not group them.
-        2. For EVERY item marked "Pass", the "comment" field MUST contain actual evidence extracted from the document proving the pass (e.g., "Found title 'Project X' authored by John Doe", NOT just "The document has a title"). You must prove you read the specific detail.
-        3. If a checklist item contains multiple requirements (e.g. "Benefits AND expected outcomes"), and the document only fulfills one of them (e.g. only benefits are found), you MUST mark the status as "Warning", explaining exactly which part is missing in the comment.
+        1. For EVERY item marked "Fail" or "Warning", provide a specific, actionable recommendation in the "suggestions" array on how to fix it, indicating its type ("Fail" or "Warning"). Do not group them.
+        2. For EVERY item in the checklist, the "comment" field MUST start with the exact page or slide reference where the information was found (e.g., "[Page 5]" or "[Slide 2]").
+        3. For EVERY item marked "Pass", the "comment" field MUST contain the page reference AND actual evidence extracted from the document proving the pass (e.g., "[Page 5] Found title 'Project X' authored by John Doe", NOT just "The document has a title"). You must prove you read the specific detail by providing the exact page reference.
+        4. If a checklist item contains multiple requirements (e.g. "Benefits AND expected outcomes"), and the document only fulfills one of them (e.g. only benefits are found), you MUST mark the status as "Warning", explaining exactly which part is missing in the comment, and providing the page reference for the partial find.
         
         You must output a JSON object with the following structure:
         {{
             "checklist": [
                 {{"section": "<Section Name>", "item": "<Checklist Item>", "status": "<Pass/Fail/Warning>", "comment": "<Explanation>"}}
             ],
-            "suggestions": ["<Suggestion 1>", "<Suggestion 2>"],
+            "suggestions": [
+                {{"type": "<Fail/Warning>", "text": "<Suggestion 1>"}}
+            ],
             "rewritten_content": "<Optional: Rewritten sections or the entire document if requested>"
         }}
         
@@ -160,8 +167,8 @@ class AIEngine:
             print(f"AI Error: {e}")
             return {
                 "score": 0,
-                "checklist": [{"item": "AI Analysis", "status": "Fail", "comment": f"Error: {str(e)}"}],
-                "suggestions": ["Check configuration and try again."],
+                "checklist": [{"section": "General", "item": "AI Analysis", "status": "Fail", "comment": f"Error: {str(e)}"}],
+                "suggestions": [{"type": "Fail", "text": "Check configuration and try again."}],
                 "rewritten_content": ""
             }
 

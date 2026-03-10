@@ -129,8 +129,9 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
             doc.setFontSize(10);
             doc.setTextColor(71, 85, 105);
 
-            result.suggestions.forEach((suggestion, idx) => {
-                const text = `${idx + 1}. ${suggestion}`;
+            result.suggestions.forEach((suggestion: any, idx) => {
+                const suggestionText = typeof suggestion === 'string' ? suggestion : suggestion.text;
+                const text = `${idx + 1}. ${suggestionText}`;
                 const splitText = doc.splitTextToSize(text, 180);
 
                 if (currentY + (splitText.length * 5) > 280) {
@@ -266,40 +267,53 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                         </div>
                     ) : (
                         Object.entries(groupedChecklist).map(([section, items], idx) => (
-                        <motion.div key={`${section}-${idx}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-slate-50/30">
-                            <div className="bg-slate-50/80 px-5 py-4 border-b border-slate-200/80 backdrop-blur-sm relative">
-                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-400" />
-                                <h4 className="font-bold text-slate-800 pl-2 tracking-wide uppercase text-sm">{section}</h4>
-                            </div>
-                            <div className="divide-y divide-slate-100/80">
-                                {items.map((item, i) => (
-                                    <div key={i} className="flex flex-col sm:flex-row items-start gap-4 p-5 bg-white hover:bg-slate-50/80 transition-colors w-full">
-                                        <div className="mt-1 flex-shrink-0">
-                                            {item.status === 'Pass' && <CheckCircle className="w-6 h-6 text-emerald-500 drop-shadow-sm" />}
-                                            {item.status === 'Fail' && <XCircle className="w-6 h-6 text-rose-500 drop-shadow-sm" />}
-                                            {item.status === 'Warning' && <AlertTriangle className="w-6 h-6 text-amber-500 drop-shadow-sm" />}
-                                        </div>
-                                        <div className="flex-1 w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                            <div className="flex-1 max-w-xl">
-                                                <h5 className="font-bold text-slate-800 text-[15px] leading-snug">{item.item}</h5>
-                                                {item.comment && <p className="text-[14px] text-slate-600 mt-1.5 leading-relaxed">{item.comment}</p>}
+                            <motion.div key={`${section}-${idx}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-slate-50/30">
+                                <div className="bg-slate-50/80 px-5 py-4 border-b border-slate-200/80 backdrop-blur-sm relative">
+                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-400" />
+                                    <h4 className="font-bold text-slate-800 pl-2 tracking-wide uppercase text-sm">{section}</h4>
+                                </div>
+                                <div className="divide-y divide-slate-100/80">
+                                    {items.map((item, i) => (
+                                        <div key={i} className="flex flex-col sm:flex-row items-start gap-4 p-5 bg-white hover:bg-slate-50/80 transition-colors w-full">
+                                            <div className="mt-1 flex-shrink-0">
+                                                {item.status === 'Pass' && <CheckCircle className="w-6 h-6 text-emerald-500 drop-shadow-sm" />}
+                                                {item.status === 'Fail' && <XCircle className="w-6 h-6 text-rose-500 drop-shadow-sm" />}
+                                                {item.status === 'Warning' && <AlertTriangle className="w-6 h-6 text-amber-500 drop-shadow-sm" />}
                                             </div>
-                                            <div className="flex-shrink-0">
-                                                <span className={clsx(
-                                                    "px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase shadow-sm border",
-                                                    item.status === 'Pass' && "bg-emerald-50 text-emerald-700 border-emerald-200",
-                                                    item.status === 'Fail' && "bg-rose-50 text-rose-700 border-rose-200",
-                                                    item.status === 'Warning' && "bg-amber-50 text-amber-700 border-amber-200"
-                                                )}>
-                                                    {item.status}
-                                                </span>
+                                            <div className="flex-1 w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                                <div className="flex-1 max-w-xl">
+                                                    <h5 className="font-bold text-slate-800 text-[15px] leading-snug">{item.item}</h5>
+                                                    {item.comment && (
+                                                        <p className="text-[14px] text-slate-600 mt-1.5 leading-relaxed">
+                                                            {item.comment.split(/(\[Page \d+\]|\[Slide \d+\]|\[Section \d+\])/g).map((part, index) => {
+                                                                if (part.match(/\[Page \d+\]|\[Slide \d+\]|\[Section \d+\]/)) {
+                                                                    return (
+                                                                        <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 mr-1 shadow-sm">
+                                                                            {part.replace(/[\[\]]/g, '')}
+                                                                        </span>
+                                                                    );
+                                                                }
+                                                                return part;
+                                                            })}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="flex-shrink-0">
+                                                    <span className={clsx(
+                                                        "px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase shadow-sm border",
+                                                        item.status === 'Pass' && "bg-emerald-50 text-emerald-700 border-emerald-200",
+                                                        item.status === 'Fail' && "bg-rose-50 text-rose-700 border-rose-200",
+                                                        item.status === 'Warning' && "bg-amber-50 text-amber-700 border-amber-200"
+                                                    )}>
+                                                        {item.status}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </motion.div>
-                    )))}
+                                    ))}
+                                </div>
+                            </motion.div>
+                        )))}
                 </div>
             </motion.div>
 
@@ -324,12 +338,32 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                         animate="show"
                         className="space-y-4 relative z-10"
                     >
-                        {result.suggestions.map((suggestion, idx) => (
-                            <motion.li variants={itemVariants} key={idx} className="flex gap-4 text-indigo-100 bg-white/5 backdrop-blur-md p-5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors">
-                                <span className="font-black text-indigo-400 text-lg">{idx + 1}.</span>
-                                <span className="leading-relaxed">{suggestion}</span>
-                            </motion.li>
-                        ))}
+                        {result.suggestions.map((suggestion: any, idx) => {
+                            const isObj = typeof suggestion !== 'string';
+                            const type = isObj ? suggestion.type : 'Unknown';
+                            const text = isObj ? suggestion.text : suggestion;
+
+                            let borderClass = 'border-white/10';
+                            let iconClass = 'text-indigo-400';
+                            let bgClass = 'bg-white/5 hover:bg-white/10';
+
+                            if (type === 'Fail') {
+                                borderClass = 'border-rose-500/40';
+                                iconClass = 'text-rose-400';
+                                bgClass = 'bg-rose-500/10 hover:bg-rose-500/20';
+                            } else if (type === 'Warning') {
+                                borderClass = 'border-amber-500/40';
+                                iconClass = 'text-amber-400';
+                                bgClass = 'bg-amber-500/10 hover:bg-amber-500/20';
+                            }
+
+                            return (
+                                <motion.li variants={itemVariants} key={idx} className={clsx("flex gap-4 text-indigo-50 backdrop-blur-md p-5 rounded-xl border transition-colors", borderClass, bgClass)}>
+                                    <span className={clsx("font-black text-lg", iconClass)}>{idx + 1}.</span>
+                                    <span className="leading-relaxed">{text}</span>
+                                </motion.li>
+                            );
+                        })}
                     </motion.ul>
                 </motion.div>
             )}

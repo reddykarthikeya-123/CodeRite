@@ -12,7 +12,7 @@ export interface Connection {
 export interface ReviewResponse {
   score: number;
   checklist: Array<{ section: string; item: string; status: string; comment: string }>;
-  suggestions: string[];
+  suggestions: { type: string; text: string }[];
   rewritten_content?: string;
   filename?: string;
 }

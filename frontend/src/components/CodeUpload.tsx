@@ -105,7 +105,7 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
     };
 
     return (
-        <div className="w-full bg-white rounded-3xl shadow-xl border border-slate-100 p-8 relative overflow-hidden group">
+        <div className="w-full min-w-[420px] h-[580px] bg-white rounded-3xl shadow-xl border border-slate-100 p-8 flex flex-col relative overflow-hidden group">
             {/* Error Notification */}
             <AnimatePresence>
                 {error && (
@@ -113,9 +113,9 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
                         initial={{ opacity: 0, y: -20, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                        className="absolute top-0 left-0 right-0 z-50 mb-4"
+                        className="absolute top-0 left-0 right-0 z-50 p-4 pointer-events-none"
                     >
-                        <div className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4 shadow-lg flex items-start gap-3">
+                        <div className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4 shadow-lg flex items-start gap-3 pointer-events-auto">
                             <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
                             <p className="text-rose-800 text-sm font-medium flex-1">{error}</p>
                             <button
@@ -129,7 +129,7 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
                 )}
             </AnimatePresence>
 
-            <div className="flex bg-slate-100 p-1 rounded-xl mb-6 relative">
+            <div className="flex bg-slate-100 p-1 rounded-xl mb-4 relative flex-shrink-0 z-10 h-[44px]">
                 <div
                     className="absolute inset-y-1 w-1/2 bg-white rounded-lg shadow-sm transition-transform duration-300 ease-in-out"
                     style={{ transform: `translateX(${activeTab === 'paste' ? 'calc(100% - 4px)' : '4px'})` }}
@@ -148,101 +148,104 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
                 </button>
             </div>
 
-            <AnimatePresence mode="wait">
-                {activeTab === 'files' ? (
-                    <motion.div
-                        key="files"
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 20 }}
-                        transition={{ duration: 0.2 }}
-                    >
-                        <div
-                            className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 ease-out cursor-pointer
-                ${isDragging
-                                    ? 'border-indigo-400 bg-indigo-50/50 scale-[1.02] shadow-inner'
-                                    : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50/50'}`}
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={handleDrop}
-                            onClick={() => fileInputRef.current?.click()}
+            <div className="flex-1 flex flex-col overflow-hidden relative z-0">
+                <AnimatePresence mode="wait">
+                    {activeTab === 'files' ? (
+                        <motion.div
+                            key="files"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            transition={{ duration: 0.2 }}
+                            className="flex-1 flex flex-col overflow-hidden w-full h-full"
                         >
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                multiple
-                                className="hidden"
-                                onChange={handleFileInput}
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/20 pointer-events-none rounded-2xl" />
+                            <div
+                                className={`flex-1 flex flex-col items-center justify-center relative border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-300 ease-out cursor-pointer
+                ${isDragging
+                                        ? 'border-indigo-400 bg-indigo-50/50 scale-[1.02] shadow-inner'
+                                        : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50/50'}`}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    multiple
+                                    className="hidden"
+                                    onChange={handleFileInput}
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/20 pointer-events-none rounded-2xl" />
 
-                            <div className="relative z-10">
-                                <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 transition-all duration-300
+                                <div className="relative z-10">
+                                    <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 transition-all duration-300
                   ${isDragging ? 'bg-indigo-100 text-indigo-600 scale-110' : 'bg-slate-100 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500'}`}>
-                                    <FileCode2 className={`w-10 h-10 ${isDragging ? 'animate-bounce' : ''}`} />
-                                </div>
+                                        <FileCode2 className={`w-10 h-10 ${isDragging ? 'animate-bounce' : ''}`} />
+                                    </div>
 
-                                <h3 className="text-xl font-bold text-slate-800 tracking-tight mb-2">
-                                    Drop code files here
-                                </h3>
-                                <p className="text-slate-500 mb-6 font-medium">
-                                    or click to browse from your computer
-                                </p>
+                                    <h3 className="text-xl font-bold text-slate-800 tracking-tight mb-2">
+                                        Drop code files here
+                                    </h3>
+                                    <p className="text-slate-500 mb-6 font-medium">
+                                        or click to browse from your computer
+                                    </p>
 
-                                <div className="flex gap-2 justify-center flex-wrap max-w-sm mx-auto">
-                                    {['.py', '.js', '.ts', '.java', '.cpp', '.cs', '.go', '.html', '.css', '...'].map((ext) => (
-                                        <span key={ext} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-semibold tracking-wide border border-slate-200/60 shadow-sm">
-                                            {ext}
-                                        </span>
-                                    ))}
+                                    <div className="flex gap-2 justify-center flex-wrap max-w-sm mx-auto">
+                                        {['.py', '.js', '.ts', '.java', '.cpp', '.cs', '.go', '.html', '.css', '...'].map((ext) => (
+                                            <span key={ext} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-semibold tracking-wide border border-slate-200/60 shadow-sm">
+                                                {ext}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {selectedFiles.length > 0 && (
-                            <div className="mt-6">
-                                <h4 className="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider">Selected Files</h4>
-                                <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                                    {selectedFiles.map((f, i) => (
-                                        <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 group/item">
-                                            <div className="flex items-center gap-3 overflow-hidden">
-                                                <Code2 className="w-5 h-5 text-indigo-400 flex-shrink-0" />
-                                                <span className="text-sm font-medium text-slate-700 truncate">{f.file.name}</span>
-                                                <span className="text-xs text-slate-400">({(f.file.size / 1024).toFixed(1)} KB)</span>
+                            {selectedFiles.length > 0 && (
+                                <div className="mt-4 flex-shrink-0">
+                                    <h4 className="text-sm font-bold text-slate-700 mb-2 uppercase tracking-wider">Selected Files</h4>
+                                    <div className="space-y-2 max-h-24 overflow-y-auto pr-2 custom-scrollbar">
+                                        {selectedFiles.map((f, i) => (
+                                            <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 group/item">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <Code2 className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+                                                    <span className="text-sm font-medium text-slate-700 truncate">{f.file.name}</span>
+                                                    <span className="text-xs text-slate-400">({(f.file.size / 1024).toFixed(1)} KB)</span>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); removeFile(i); }}
+                                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover/item:opacity-100"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); removeFile(i); }}
-                                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover/item:opacity-100"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-                    </motion.div>
-                ) : (
-                    <motion.div
-                        key="paste"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex flex-col h-64"
-                    >
-                        <textarea
-                            value={pastedCode}
-                            onChange={(e) => setPastedCode(e.target.value)}
-                            placeholder="Paste your source code here for analysis..."
-                            className="flex-1 w-full bg-slate-50 border border-slate-200 rounded-xl p-4 font-mono text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none custom-scrollbar"
-                            spellCheck={false}
-                        />
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                            )}
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="paste"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            transition={{ duration: 0.2 }}
+                            className="flex-1 flex flex-col w-full h-full"
+                        >
+                            <textarea
+                                value={pastedCode}
+                                onChange={(e) => setPastedCode(e.target.value)}
+                                placeholder="Paste your source code here for analysis..."
+                                className="flex-1 w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-6 font-mono text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400/50 resize-none custom-scrollbar shadow-inner"
+                                spellCheck={false}
+                            />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
 
-            <div className="mt-8 flex justify-end relative z-10">
+            <div className="mt-6 flex justify-end relative z-10 flex-shrink-0 h-[54px]">
                 <button
                     onClick={handleSubmit}
                     disabled={activeTab === 'files' ? selectedFiles.length === 0 : pastedCode.trim().length === 0}

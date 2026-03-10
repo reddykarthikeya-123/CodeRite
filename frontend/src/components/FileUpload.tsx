@@ -60,7 +60,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
     };
 
     return (
-        <div className="mb-8 w-full max-w-2xl mx-auto">
+        <div className="mb-8 w-full max-w-4xl mx-auto">
             {categories.length > 0 && (
                 <motion.div
                     initial={{ opacity: 0, y: -10 }}
@@ -94,58 +94,66 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
                 </motion.div>
             )}
 
-            <motion.div
-                className={`relative overflow-hidden border-2 border-dashed rounded-3xl p-12 text-center cursor-pointer transition-all duration-300 ${isDragging
-                    ? 'border-indigo-500 bg-indigo-50/80 shadow-[inset_0_0_50px_rgba(99,102,241,0.1)] scale-[1.02]'
-                    : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-50 hover:shadow-xl hover:shadow-indigo-500/10'
-                    }`}
-                onDragOver={onDragOver}
-                onDragLeave={onDragLeave}
-                onDrop={onDrop}
-                onClick={() => fileInputRef.current?.click()}
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.98 }}
-            >
-                <input
-                    type="file"
-                    className="hidden"
-                    ref={fileInputRef}
-                    accept=".pdf,.docx,.txt,.md,.py,.js,.ts,.json,.html,.css,.xlsx,.csv,.xls,.pptx"
-                    onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-                />
+            <div className="w-full min-w-[420px] h-[580px] bg-white rounded-3xl shadow-xl border border-slate-100 p-8 flex flex-col relative overflow-hidden group mx-auto">
+                <div className="h-[44px] mb-4 flex-shrink-0" />
+                
+                <motion.div
+                    className={`flex-1 flex flex-col items-center justify-center relative overflow-hidden border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 ${isDragging
+                        ? 'border-indigo-500 bg-indigo-50/80 shadow-[inset_0_0_50px_rgba(99,102,241,0.1)] scale-[1.02]'
+                        : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-50 hover:shadow-xl hover:shadow-indigo-500/10'
+                        }`}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                >
+                    <input
+                        type="file"
+                        className="hidden"
+                        ref={fileInputRef}
+                        accept=".pdf,.docx,.txt,.md,.py,.js,.ts,.json,.html,.css,.xlsx,.csv,.xls,.pptx"
+                        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                    />
 
-                {uploading ? (
-                    <div className="flex flex-col items-center animate-pulse relative z-10">
-                        <FileText className="w-16 h-16 text-indigo-500 mb-4 drop-shadow-lg" />
-                        <p className="text-slate-600 font-semibold tracking-wide">Processing Document...</p>
-                    </div>
-                ) : (
-                    <div className="flex flex-col items-center relative z-10">
-                        <div className="p-4 bg-white rounded-full shadow-sm mb-6 border border-slate-100 group-hover:scale-110 transition-transform">
-                            <Upload className="w-10 h-10 text-indigo-500" />
+                    {uploading ? (
+                        <div className="flex flex-col items-center animate-pulse relative z-10">
+                            <FileText className="w-16 h-16 text-indigo-500 mb-4 drop-shadow-lg" />
+                            <p className="text-slate-600 font-semibold tracking-wide">Processing Document...</p>
                         </div>
-                        <p className="text-xl font-bold text-slate-700 mb-2 tracking-tight">
-                            Drag & drop your document here
-                        </p>
-                        <p className="text-slate-500 mb-6">
-                            or <span className="text-indigo-600 hover:text-indigo-700 underline underline-offset-4 cursor-pointer">browse from your computer</span>
-                        </p>
-                        <p className="text-slate-500 text-sm mt-3 font-medium">
-                            Supports PDFs, Word Docs (.docx), Excel (.xlsx, .csv), and PowerPoint (.pptx)
-                        </p>
-                        <p className="text-slate-400 text-xs mt-1">
-                            Embedded flowcharts and screenshots are automatically graded via AI Vision.
-                        </p>
+                    ) : (
+                        <div className="flex flex-col items-center relative z-10">
+                            <div className="p-4 bg-white rounded-full shadow-sm mb-6 border border-slate-100 group-hover:scale-110 transition-transform">
+                                <Upload className="w-10 h-10 text-indigo-500" />
+                            </div>
+                            <p className="text-xl font-bold text-slate-700 mb-2 tracking-tight">
+                                Drag & drop your document here
+                            </p>
+                            <p className="text-slate-500 mb-6">
+                                or <span className="text-indigo-600 hover:text-indigo-700 underline underline-offset-4 cursor-pointer">browse from your computer</span>
+                            </p>
+                            <p className="text-slate-500 text-sm mt-3 font-medium">
+                                Supports PDFs, Word Docs (.docx), Excel (.xlsx, .csv), and PowerPoint (.pptx)
+                            </p>
+                            <p className="text-slate-400 text-xs mt-1">
+                                Embedded flowcharts and screenshots are automatically graded via AI Vision.
+                            </p>
+                        </div>
+                    )}
+                </motion.div>
+
+                <div className="mt-6 h-[54px] flex-shrink-0" />
+
+                {error && (
+                    <div className="absolute top-0 left-0 right-0 z-50 p-4 pointer-events-none">
+                        <div className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4 shadow-lg flex items-start gap-3 pointer-events-auto">
+                            <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+                            <p className="text-rose-800 text-sm font-medium flex-1">{error}</p>
+                        </div>
                     </div>
                 )}
-            </motion.div>
-
-            {error && (
-                <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5" />
-                    {error}
-                </div>
-            )}
+            </div>
         </div>
     );
 };

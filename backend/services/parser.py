@@ -95,7 +95,15 @@ async def _parse_pdf(file: UploadFile) -> tuple[str, list]:
 async def _parse_docx(file: UploadFile) -> tuple[str, list]:
     content = await file.read()
     doc = Document(io.BytesIO(content))
-    text = "\n".join([para.text for para in doc.paragraphs])
+    
+    text = ""
+    paragraphs = doc.paragraphs
+    # Group paragraphs into virtual sections for reference (approx 10 paras per section)
+    for i, para in enumerate(paragraphs):
+        if i % 10 == 0:
+            text += f"\n--- Section {(i // 10) + 1} ---\n"
+        if para.text.strip():
+            text += para.text + "\n"
     
     base64_images = []
     
