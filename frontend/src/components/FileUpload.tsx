@@ -19,12 +19,16 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
         fetchChecklistCategories()
             .then(cats => {
                 setCategories(cats);
-                if (cats.length > 0) setSelectedCategory(cats[0]); // Default to first proper checklist
+                // Don't set a default category - let user explicitly select
             })
             .catch(err => console.error("Failed to load categories", err));
     }, []);
 
     const handleFile = async (file: File) => {
+        if (!selectedCategory) {
+            setError("Please select an audit document category before uploading.");
+            return;
+        }
         setUploading(true);
         setError(null);
         try {
@@ -75,6 +79,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
                                 onChange={(e) => setSelectedCategory(e.target.value)}
                                 className="w-full px-5 py-3.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-inner text-slate-700 font-medium appearance-none cursor-pointer"
                             >
+                                <option value="" disabled>Select the audit document</option>
                                 {categories.map((cat, idx) => (
                                     <option key={idx} value={cat}>{cat}</option>
                                 ))}

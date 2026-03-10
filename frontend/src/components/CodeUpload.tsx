@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { UploadCloud, FileCode2, Code2, Trash2 } from 'lucide-react';
+import { UploadCloud, FileCode2, Code2, Trash2, AlertTriangle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CodeUploadProps {
@@ -11,14 +11,43 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
     const [activeTab, setActiveTab] = useState<'files' | 'paste'>('files');
     const [pastedCode, setPastedCode] = useState('');
     const [selectedFiles, setSelectedFiles] = useState<{ file: File, content: string }[]>([]);
+    const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const codeExtensions = ['.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.c', '.cpp', '.h', '.hpp', 
+                          '.cs', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.r', 
+                          '.m', '.mm', '.sql', '.sh', '.bash', '.zsh', '.ps1', '.html', '.css', 
+                          '.scss', '.sass', '.less', '.vue', '.svelte', '.json', '.xml', '.yaml', 
+                          '.yml', '.toml', '.ini', '.cfg', '.conf', '.md', '.rst', '.txt'];
+    
+    const nonCodeExtensions = ['.xlsx', '.xls', '.csv', '.pdf', '.docx', '.doc', '.pptx', '.ppt',
+                              '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.ico', '.webp',
+                              '.mp3', '.mp4', '.avi', '.mov', '.zip', '.rar', '.tar', '.gz'];
 
     const processFiles = async (files: File[]) => {
         const newFiles: { file: File, content: string }[] = [];
 
         for (const file of files) {
+            const filename = file.name.toLowerCase();
+            
+            // Block non-code files immediately at frontend
+            const isNonCode = nonCodeExtensions.some(ext => filename.endsWith(ext));
+            if (isNonCode) {
+                setError(`This is not a code document. The file '${file.name}' is not suitable for code review. Please upload source code files only.`);
+                setTimeout(() => setError(null), 5000); // Auto-dismiss after 5 seconds
+                continue;
+            }
+            
+            // Warn if file extension is not recognized
+            const isKnownCode = codeExtensions.some(ext => filename.endsWith(ext));
+            if (!isKnownCode) {
+                const confirmUpload = confirm(`The file '${file.name}' has an unrecognized extension. Do you want to proceed?`);
+                if (!confirmUpload) continue;
+            }
+
             if (file.size > 5 * 1024 * 1024) { // 5MB limit per file for code
-                alert(`File ${file.name} is too large. Max size is 5MB for code files.`);
+                setError(`File '${file.name}' is too large. Max size is 5MB for code files.`);
+                setTimeout(() => setError(null), 5000);
                 continue;
             }
 
@@ -27,6 +56,8 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
                 newFiles.push({ file, content: text });
             } catch (err) {
                 console.error(`Error reading ${file.name}:`, err);
+                setError(`Failed to read ${file.name}. Please try again.`);
+                setTimeout(() => setError(null), 5000);
             }
         }
 
@@ -75,6 +106,29 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
 
     return (
         <div className="w-full bg-white rounded-3xl shadow-xl border border-slate-100 p-8 relative overflow-hidden group">
+            {/* Error Notification */}
+            <AnimatePresence>
+                {error && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                        className="absolute top-0 left-0 right-0 z-50 mb-4"
+                    >
+                        <div className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4 shadow-lg flex items-start gap-3">
+                            <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+                            <p className="text-rose-800 text-sm font-medium flex-1">{error}</p>
+                            <button
+                                onClick={() => setError(null)}
+                                className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-100 rounded-lg transition-colors"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <div className="flex bg-slate-100 p-1 rounded-xl mb-6 relative">
                 <div
                     className="absolute inset-y-1 w-1/2 bg-white rounded-lg shadow-sm transition-transform duration-300 ease-in-out"

@@ -58,7 +58,7 @@ function App() {
 
     try {
       const result = await analyzeDocument(content, "", category, images);
-      setDocReviewResult(result);
+      setDocReviewResult({ ...result, filename });
     } catch (err) {
       console.error(err);
       alert("Analysis failed. Please check the backend and configuration.");
@@ -77,9 +77,10 @@ function App() {
     try {
       const result = await analyzeCode(files);
       setCodeReviewResult(result);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Code analysis failed. Please check the backend and configuration.");
+      // Show the specific error message from backend
+      alert(err.message || "Code analysis failed. Please check the backend and configuration.");
     } finally {
       setAnalyzing(false);
     }

@@ -221,10 +221,30 @@ async def analyze_code(request: CodeAnalysisRequest, db: AsyncSession = Depends(
     # Fetch active connection safely handling multiple
     result = await db.execute(select(AIConnection).where(AIConnection.is_active == True))
     active_conn = result.scalars().first()
-    
+
     if not active_conn:
         raise HTTPException(status_code=400, detail="No active AI connection found. Please configure one in Settings.")
+
+    # Validate file extensions BEFORE sending to AI model
+    code_extensions = {'.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.c', '.cpp', '.h', '.hpp', 
+                      '.cs', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.r', 
+                      '.m', '.mm', '.sql', '.sh', '.bash', '.zsh', '.ps1', '.html', '.css', 
+                      '.scss', '.sass', '.less', '.vue', '.svelte', '.json', '.xml', '.yaml', 
+                      '.yml', '.toml', '.ini', '.cfg', '.conf', '.md', '.rst', '.txt'}
     
+    non_code_extensions = {'.xlsx', '.xls', '.csv', '.pdf', '.docx', '.doc', '.pptx', '.ppt',
+                          '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.ico', '.webp',
+                          '.mp3', '.mp4', '.avi', '.mov', '.zip', '.rar', '.tar', '.gz'}
+    
+    for f in request.files:
+        filename_lower = f.filename.lower()
+        for ext in non_code_extensions:
+            if filename_lower.endswith(ext):
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"This is not a code document. The file '{f.filename}' appears to be a {ext.upper()} file, which is not suitable for code review. Please upload source code files only (e.g., .py, .js, .ts, .java, etc.)."
+                )
+
     provider = active_conn.provider
     model_name = active_conn.model_name
     api_key = active_conn.api_key or ""

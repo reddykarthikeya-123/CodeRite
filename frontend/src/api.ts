@@ -14,6 +14,7 @@ export interface ReviewResponse {
   checklist: Array<{ section: string; item: string; status: string; comment: string }>;
   suggestions: string[];
   rewritten_content?: string;
+  filename?: string;
 }
 
 export interface CodeAnalysisResponse {
@@ -116,7 +117,12 @@ export const analyzeCode = async (files: { filename: string, content: string }[]
     body: JSON.stringify({ files }),
   });
   if (!response.ok) {
-    throw new Error("Failed to analyze code");
+    let errorMessage = "Failed to analyze code";
+    try {
+      const errorData = await response.json();
+      if (errorData.detail) errorMessage = errorData.detail;
+    } catch (e) { }
+    throw new Error(errorMessage);
   }
   return response.json();
 };

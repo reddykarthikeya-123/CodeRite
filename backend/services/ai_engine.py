@@ -166,9 +166,9 @@ class AIEngine:
             }
 
     async def analyze_code(self, files: List[dict]) -> dict:
-        system_prompt = """You are a Principal Software Engineer and an expert Code Reviewer. 
+        system_prompt = """You are a Principal Software Engineer and an expert Code Reviewer.
         Your task is to analyze the provided source code files for formatting correctness, modularity, error handling, performance issues, and language-specific best practices.
-        
+
         CRITICAL INSTRUCTIONS:
         1. Evaluate EVERY file provided in the input.
         2. Assign a score from 0 to 100 for each file based on its overall quality.
@@ -176,7 +176,7 @@ class AIEngine:
         4. Provide an array of specific, actionable `suggestions` for improvement for each file. EVERY suggestion MUST explicitly start with the relevant line number or range it applies to, using the exact line numbers provided in the input prompt (e.g., "Line 42: Extract repetitive database query..."). If a suggestion applies globally, start with "Global:".
         5. If a file is perfect, provide an empty array for `suggestions` and give it a score of 100.
         6. Calculate the `overall_score` as the strict integer average of all the individual file scores.
-        
+
         You must output a JSON object with the following exact structure:
         {{
             "overall_score": 85,

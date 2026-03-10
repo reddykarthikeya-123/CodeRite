@@ -95,7 +95,8 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
             });
         }
 
-        doc.save('Audit_Report.pdf');
+        const baseFilename = result.filename || 'Audit_Report';
+        doc.save(`${baseFilename}_Audit_Report.pdf`);
     };
 
     const getScoreColor = (score: number) => {

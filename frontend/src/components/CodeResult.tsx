@@ -262,25 +262,24 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
 
                         {/* File Feedback */}
                         <div className="p-6 space-y-6">
-
                             {!fixedCodes[idx] && (
                                 <>
-                                    {/* Highlights Section */}
-                                    {file.highlights && file.highlights.length > 0 && (
-                                        <div className="space-y-3">
-                                            <h4 className="text-sm font-bold tracking-wider text-emerald-600 uppercase flex items-center gap-2">
-                                                <Sparkles className="w-4 h-4" /> What's Good
-                                            </h4>
-                                            <ul className="space-y-2">
-                                                {file.highlights.map((highlight, hIdx) => (
-                                                    <li key={hIdx} className="flex items-start gap-3">
-                                                        <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                                                        <span className="text-slate-700 leading-relaxed font-medium">{highlight}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
+                                {/* Highlights Section */}
+                                {file.highlights && file.highlights.length > 0 && (
+                                    <div className="space-y-3">
+                                        <h4 className="text-sm font-bold tracking-wider text-emerald-600 uppercase flex items-center gap-2">
+                                            <Sparkles className="w-4 h-4" /> What's Good
+                                        </h4>
+                                        <ul className="space-y-2">
+                                            {file.highlights.map((highlight, hIdx) => (
+                                                <li key={hIdx} className="flex items-start gap-3">
+                                                    <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                                                    <span className="text-slate-700 leading-relaxed font-medium">{highlight}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
 
                                     {/* Suggestions Section */}
                                     {file.suggestions && file.suggestions.length > 0 ? (
