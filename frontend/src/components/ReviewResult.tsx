@@ -1,12 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { type ReviewResponse } from '../api';
-import { CheckCircle, XCircle, AlertTriangle, FileText, ChevronDown, ChevronUp, Edit3, ListChecks, Download } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, FileText, ChevronDown, ChevronUp, Edit3, ListChecks, Download, Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { motion, AnimatePresence, useSpring, useTransform, useMotionValue } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import clsx from 'clsx';
-import { useEffect } from 'react';
 
 interface ReviewResultProps {
     result: ReviewResponse;
@@ -14,6 +13,7 @@ interface ReviewResultProps {
 
 export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
     const [showRewritten, setShowRewritten] = useState(false);
+    const [selectedFilters, setSelectedFilters] = useState<Set<string>>(new Set(['pass', 'fail', 'warning']));
 
     // Animated Score Logic
     const animatedScore = useMotionValue(0);
@@ -23,6 +23,54 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
     useEffect(() => {
         animatedScore.set(result.score);
     }, [result.score, animatedScore]);
+
+    // Calculate counts for each status (case-insensitive, trimmed)
+    const statusCounts = useMemo(() => {
+        const counts = { Pass: 0, Fail: 0, Warning: 0 };
+        result.checklist.forEach(item => {
+            const status = (item.status || '').trim().toLowerCase();
+            if (status === 'pass') counts.Pass++;
+            else if (status === 'fail') counts.Fail++;
+            else if (status === 'warning') counts.Warning++;
+        });
+        return counts;
+    }, [result.checklist]);
+
+    // Toggle filter selection
+    const toggleFilter = (status: string) => {
+        setSelectedFilters(prev => {
+            const next = new Set(prev);
+            if (next.has(status)) {
+                // Don't allow deselecting the last remaining filter
+                if (next.size > 1) {
+                    next.delete(status);
+                }
+                return next;
+            } else {
+                next.add(status);
+                return next;
+            }
+        });
+    };
+
+    // Filter checklist items based on selected filters (case-insensitive)
+    const filteredChecklist = useMemo(() => {
+        return result.checklist.filter(item => {
+            const itemStatus = (item.status || '').trim().toLowerCase();
+            // Match against lowercase filter keys
+            return selectedFilters.has(itemStatus);
+        });
+    }, [result.checklist, selectedFilters]);
+
+    // Group filtered checklist by section
+    const groupedChecklist = useMemo(() => {
+        return filteredChecklist.reduce((acc, current) => {
+            const section = current.section || 'General';
+            if (!acc[section]) acc[section] = [];
+            acc[section].push(current);
+            return acc;
+        }, {} as Record<string, typeof filteredChecklist>);
+    }, [filteredChecklist]);
 
     const handleDownloadReport = () => {
         const doc = new jsPDF();
@@ -105,15 +153,6 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
         return 'text-rose-500 bg-rose-50 ring-rose-100 shadow-rose-500/20';
     };
 
-    const groupedChecklist = useMemo(() => {
-        return result.checklist.reduce((acc, current) => {
-            const section = current.section || 'General';
-            if (!acc[section]) acc[section] = [];
-            acc[section].push(current);
-            return acc;
-        }, {} as Record<string, typeof result.checklist>);
-    }, [result.checklist]);
-
     const containerVariants: Variants = {
         hidden: { opacity: 0 },
         show: {
@@ -159,34 +198,75 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                 transition={{ delay: 0.2 }}
                 className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-8 sm:p-10 border border-slate-100"
             >
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-slate-100 pb-6">
+                <div className="flex items-center justify-between gap-6 border-b border-slate-100 pb-6">
                     <h3 className="text-2xl font-bold text-slate-800 flex items-center gap-3 tracking-tight">
-                        <div className="p-2 bg-indigo-50 rounded-lg">
+                        <div className="p-2.5 bg-indigo-50 rounded-xl">
                             <ListChecks className="w-7 h-7 text-indigo-600" />
                         </div>
                         Compliance Audit
                     </h3>
-                    <div className="flex items-center gap-3">
-                        <span className="px-4 py-1.5 bg-slate-100 text-slate-700 text-sm font-bold rounded-full border border-slate-200">
-                            {result.checklist.length} Checks Validated
+                    <div className="flex items-center gap-4">
+                        {/* Status Filter Pills */}
+                        <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-full border border-slate-200">
+                            <Filter className="w-3.5 h-3.5 text-slate-400 mr-1" />
+                            <button
+                                onClick={() => toggleFilter('pass')}
+                                className={clsx(
+                                    "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all border shadow-sm",
+                                    selectedFilters.has('pass')
+                                        ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-emerald-600"
+                                        : "bg-white text-slate-600 border-slate-200 hover:border-emerald-300 hover:text-emerald-600"
+                                )}
+                            >
+                                Pass ({statusCounts.Pass})
+                            </button>
+                            <button
+                                onClick={() => toggleFilter('fail')}
+                                className={clsx(
+                                    "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all border shadow-sm",
+                                    selectedFilters.has('fail')
+                                        ? "bg-gradient-to-r from-rose-500 to-rose-600 text-white border-rose-600"
+                                        : "bg-white text-slate-600 border-slate-200 hover:border-rose-300 hover:text-rose-600"
+                                )}
+                            >
+                                Fail ({statusCounts.Fail})
+                            </button>
+                            <button
+                                onClick={() => toggleFilter('warning')}
+                                className={clsx(
+                                    "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all border shadow-sm",
+                                    selectedFilters.has('warning')
+                                        ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-600"
+                                        : "bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-600"
+                                )}
+                            >
+                                Warning ({statusCounts.Warning})
+                            </button>
+                        </div>
+                        <div className="h-6 w-px bg-slate-200" />
+                        <span className="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-bold rounded-lg border border-slate-200 text-center flex items-center justify-center min-w-[100px]">
+                            {filteredChecklist.length} / {result.checklist.length}<br />Items
                         </span>
+                        <div className="h-6 w-px bg-slate-200" />
                         <button
                             onClick={handleDownloadReport}
-                            className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white text-sm font-semibold rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
                         >
                             <Download className="w-4 h-4" /> Download Report
                         </button>
                     </div>
                 </div>
 
-                <motion.div
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="show"
-                    className="space-y-8"
-                >
-                    {Object.entries(groupedChecklist).map(([section, items], idx) => (
-                        <motion.div variants={itemVariants} key={idx} className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-slate-50/30">
+                <div className="space-y-6" key={Array.from(selectedFilters).sort().join('-')}>
+                    {Object.entries(groupedChecklist).length === 0 ? (
+                        <div className="text-center py-16">
+                            <Filter className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                            <p className="text-slate-500 font-medium">No items match the selected filters</p>
+                            <p className="text-slate-400 text-sm mt-1">Select a filter above to view items</p>
+                        </div>
+                    ) : (
+                        Object.entries(groupedChecklist).map(([section, items], idx) => (
+                        <motion.div key={`${section}-${idx}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-slate-50/30">
                             <div className="bg-slate-50/80 px-5 py-4 border-b border-slate-200/80 backdrop-blur-sm relative">
                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-400" />
                                 <h4 className="font-bold text-slate-800 pl-2 tracking-wide uppercase text-sm">{section}</h4>
@@ -219,38 +299,40 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                                 ))}
                             </div>
                         </motion.div>
-                    ))}
-                </motion.div>
+                    )))}
+                </div>
             </motion.div>
 
-            {/* Suggestions */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 rounded-3xl shadow-2xl p-8 sm:p-10 border border-indigo-500/20 text-indigo-50 relative overflow-hidden"
-            >
-                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl" />
-                <h3 className="text-2xl font-bold text-white mb-8 flex items-center gap-3 relative z-10 tracking-tight">
-                    <div className="p-2 bg-indigo-500/20 rounded-lg backdrop-blur-sm border border-indigo-400/30">
-                        <Edit3 className="w-6 h-6 text-indigo-300" />
-                    </div>
-                    Key Improvements & Suggestions
-                </h3>
-                <motion.ul
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="show"
-                    className="space-y-4 relative z-10"
+            {/* Suggestions - Only show if there are suggestions AND score is not 100 */}
+            {result.suggestions && result.suggestions.length > 0 && result.score < 100 && (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 rounded-3xl shadow-2xl p-8 sm:p-10 border border-indigo-500/20 text-indigo-50 relative overflow-hidden"
                 >
-                    {result.suggestions.map((suggestion, idx) => (
-                        <motion.li variants={itemVariants} key={idx} className="flex gap-4 text-indigo-100 bg-white/5 backdrop-blur-md p-5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors">
-                            <span className="font-black text-indigo-400 text-lg">{idx + 1}.</span>
-                            <span className="leading-relaxed">{suggestion}</span>
-                        </motion.li>
-                    ))}
-                </motion.ul>
-            </motion.div>
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl" />
+                    <h3 className="text-2xl font-bold text-white mb-8 flex items-center gap-3 relative z-10 tracking-tight">
+                        <div className="p-2 bg-indigo-500/20 rounded-lg backdrop-blur-sm border border-indigo-400/30">
+                            <Edit3 className="w-6 h-6 text-indigo-300" />
+                        </div>
+                        Key Improvements & Suggestions
+                    </h3>
+                    <motion.ul
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="show"
+                        className="space-y-4 relative z-10"
+                    >
+                        {result.suggestions.map((suggestion, idx) => (
+                            <motion.li variants={itemVariants} key={idx} className="flex gap-4 text-indigo-100 bg-white/5 backdrop-blur-md p-5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors">
+                                <span className="font-black text-indigo-400 text-lg">{idx + 1}.</span>
+                                <span className="leading-relaxed">{suggestion}</span>
+                            </motion.li>
+                        ))}
+                    </motion.ul>
+                </motion.div>
+            )}
 
             {/* Rewritten Content Expander */}
             {result.rewritten_content && (
