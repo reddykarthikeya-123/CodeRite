@@ -85,7 +85,7 @@ export const uploadFile = async (file: File): Promise<{ filename: string; conten
     try {
       const errorData = await response.json();
       if (errorData.detail) errorMessage = errorData.detail;
-    } catch (e) { }
+    } catch { }
     throw new Error(errorMessage);
   }
   return response.json();
@@ -121,7 +121,7 @@ export const analyzeCode = async (files: { filename: string, content: string }[]
     try {
       const errorData = await response.json();
       if (errorData.detail) errorMessage = errorData.detail;
-    } catch (e) { }
+    } catch { }
     throw new Error(errorMessage);
   }
   return response.json();

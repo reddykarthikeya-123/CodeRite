@@ -21,10 +21,15 @@ from services.checklist_loader import loader
 
 app = FastAPI(title="Document Scorer API")
 
+import os
+
 # CORS Setup
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
+allowed_origins = allowed_origins_env.split(",") if allowed_origins_env != "*" else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For prototype, allow all. Restrict in production.
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

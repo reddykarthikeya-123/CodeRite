@@ -117,7 +117,7 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
             }
         });
 
-        const finalY = (doc as any).lastAutoTable.finalY || 40;
+        const finalY = (doc as any).lastAutoTable?.finalY || 40;
         let currentY = finalY + 15;
 
         if (result.suggestions && result.suggestions.length > 0) {
@@ -129,7 +129,7 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
             doc.setFontSize(10);
             doc.setTextColor(71, 85, 105);
 
-            result.suggestions.forEach((suggestion: any, idx) => {
+            result.suggestions.forEach((suggestion: { type: string; text: string } | string, idx) => {
                 const suggestionText = typeof suggestion === 'string' ? suggestion : suggestion.text;
                 const text = `${idx + 1}. ${suggestionText}`;
                 const splitText = doc.splitTextToSize(text, 180);
@@ -144,7 +144,8 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
             });
         }
 
-        const baseFilename = result.filename || 'Audit_Report';
+        // Remove any file extension from the original filename, then append _Audit_Report.pdf
+        const baseFilename = (result.filename || 'Audit_Report').replace(/\.[^/.]+$/g, '');
         doc.save(`${baseFilename}_Audit_Report.pdf`);
     };
 
@@ -285,16 +286,22 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                                                     <h5 className="font-bold text-slate-800 text-[15px] leading-snug">{item.item}</h5>
                                                     {item.comment && (
                                                         <p className="text-[14px] text-slate-600 mt-1.5 leading-relaxed">
-                                                            {item.comment.split(/(\[Page \d+\]|\[Slide \d+\]|\[Section \d+\])/g).map((part, index) => {
-                                                                if (part.match(/\[Page \d+\]|\[Slide \d+\]|\[Section \d+\]/)) {
-                                                                    return (
-                                                                        <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 mr-1 shadow-sm">
-                                                                            {part.replace(/[\[\]]/g, '')}
-                                                                        </span>
-                                                                    );
-                                                                }
-                                                                return part;
-                                                            })}
+                                                            {/* Only show Page and Slide references for non-Fail items (exclude Section references) */}
+                                                            {item.status !== 'Fail' ? (
+                                                                item.comment.split(/([Page \d+]|[Slide \d+])/g).map((part, index) => {
+                                                                    if (part.match(/[Page \d+]|[Slide \d+]/)) {
+                                                                        return (
+                                                                            <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 mr-1 shadow-sm">
+                                                                                {part.replace(/[[\]]/g, '')}
+                                                                            </span>
+                                                                        );
+                                                                    }
+                                                                    return part;
+                                                                })
+                                                            ) : (
+                                                                // For Fail items, remove all references and show only the comment text
+                                                                item.comment.replace(/[Page \d+]|[Slide \d+]|[Section \d+]/g, '').trim()
+                                                            )}
                                                         </p>
                                                     )}
                                                 </div>
@@ -338,10 +345,10 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                         animate="show"
                         className="space-y-4 relative z-10"
                     >
-                        {result.suggestions.map((suggestion: any, idx) => {
+                        {result.suggestions.map((suggestion: { type: string; text: string } | string, idx) => {
                             const isObj = typeof suggestion !== 'string';
-                            const type = isObj ? suggestion.type : 'Unknown';
-                            const text = isObj ? suggestion.text : suggestion;
+                            const type = isObj ? (suggestion as { type: string; text: string }).type : 'Unknown';
+                            const text = isObj ? (suggestion as { type: string; text: string }).text : (suggestion as string);
 
                             let borderClass = 'border-white/10';
                             let iconClass = 'text-indigo-400';
