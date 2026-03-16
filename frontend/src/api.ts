@@ -1,31 +1,31 @@
+import type {
+  Connection,
+  ReviewResponse,
+  CodeAnalysisResponse,
+  AnalyzeDocumentRequest,
+  AnalyzeCodeRequest,
+  AutoFixRequest,
+  AutoFixResponse,
+  BatchAutoFixRequest,
+  BatchAutoFixResponse,
+  ChecklistItem
+} from "./api/types";
+
+// Re-export types for convenience
+export type {
+  Connection,
+  ReviewResponse,
+  CodeAnalysisResponse,
+  AnalyzeDocumentRequest,
+  AnalyzeCodeRequest,
+  AutoFixRequest,
+  AutoFixResponse,
+  BatchAutoFixRequest,
+  BatchAutoFixResponse,
+  ChecklistItem
+};
+
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-
-export interface Connection {
-  id?: number;
-  name: string;
-  provider: string;
-  model_name: string;
-  api_key?: string;
-  is_active?: boolean;
-}
-
-export interface ReviewResponse {
-  score: number;
-  checklist: Array<{ section: string; item: string; status: string; comment: string }>;
-  suggestions: { type: string; text: string }[];
-  rewritten_content?: string;
-  filename?: string;
-}
-
-export interface CodeAnalysisResponse {
-  overall_score: number;
-  files: {
-    filename: string;
-    score: number;
-    highlights: string[];
-    suggestions: string[];
-  }[];
-}
 
 export const fetchConnections = async (): Promise<Connection[]> => {
   const response = await fetch(`${API_BASE_URL}/connections`);
@@ -48,31 +48,29 @@ export const updateConnection = async (id: number, conn: Connection): Promise<vo
   });
 };
 
-export const testConnection = async (conn: Connection): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/connections/test`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(conn),
-  });
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || "Connection test failed");
-  }
-};
-
-export const activateConnection = async (id: number): Promise<void> => {
-  await fetch(`${API_BASE_URL}/connections/${id}/activate`, {
-    method: "PUT"
-  });
-};
-
 export const deleteConnection = async (id: number): Promise<void> => {
   await fetch(`${API_BASE_URL}/connections/${id}`, {
-    method: "DELETE"
+    method: "DELETE",
   });
 };
 
-export const uploadFile = async (file: File): Promise<{ filename: string; content: string; images?: string[] }> => {
+export const setActiveConnection = async (id: number): Promise<void> => {
+  await fetch(`${API_BASE_URL}/connections/${id}/activate`, {
+    method: "POST",
+  });
+};
+
+// Alias for backward compatibility
+export const activateConnection = setActiveConnection;
+
+export const testConnection = async (id: number): Promise<{ success: boolean; message: string }> => {
+  const response = await fetch(`${API_BASE_URL}/connections/${id}/test`, {
+    method: "POST",
+  });
+  return response.json();
+};
+
+export const uploadFile = async (file: File): Promise<{ text: string; images: string[]; filename?: string }> => {
   const formData = new FormData();
   formData.append("file", file);
 
@@ -85,10 +83,18 @@ export const uploadFile = async (file: File): Promise<{ filename: string; conten
     try {
       const errorData = await response.json();
       if (errorData.detail) errorMessage = errorData.detail;
-    } catch { }
+    } catch (parseError) {
+      console.warn('Failed to parse error response:', parseError);
+    }
     throw new Error(errorMessage);
   }
-  return response.json();
+  const data = await response.json();
+  // Map backend response {text, images} to expected format
+  return {
+    text: data.text || data.content,
+    images: data.images || [],
+    filename: data.filename
+  };
 };
 
 export const fetchChecklistCategories = async (): Promise<string[]> => {
@@ -97,8 +103,18 @@ export const fetchChecklistCategories = async (): Promise<string[]> => {
   return data.categories || [];
 };
 
-export const analyzeDocument = async (text: string, customInstructions: string, documentCategory?: string, images?: string[], fileType?: string): Promise<ReviewResponse> => {
-  const payload: any = { text, custom_instructions: customInstructions, images: images || [] };
+export const analyzeDocument = async (
+  text: string, 
+  customInstructions: string, 
+  documentCategory?: string, 
+  images?: string[], 
+  fileType?: string
+): Promise<ReviewResponse> => {
+  const payload: AnalyzeDocumentRequest = { 
+    text, 
+    custom_instructions: customInstructions, 
+    images: images || [] 
+  };
   if (documentCategory) payload.document_category = documentCategory;
   if (fileType) payload.file_type = fileType;
 
@@ -112,48 +128,40 @@ export const analyzeDocument = async (text: string, customInstructions: string, 
 };
 
 export const analyzeCode = async (files: { filename: string, content: string }[]): Promise<CodeAnalysisResponse> => {
+  const payload: AnalyzeCodeRequest = { files };
   const response = await fetch(`${API_BASE_URL}/analyze-code`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ files }),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    let errorMessage = "Failed to analyze code";
-    try {
-      const errorData = await response.json();
-      if (errorData.detail) errorMessage = errorData.detail;
-    } catch { }
-    throw new Error(errorMessage);
+    throw new Error("Code analysis failed");
   }
   return response.json();
 };
 
-export const autoFixCode = async (filename: string, content: string, selected_suggestions: string[]): Promise<{ fixed_code: string }> => {
-  const response = await fetch(`${API_BASE_URL}/auto-fix-code`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename, content, selected_suggestions }),
-  });
-  if (!response.ok) {
-    throw new Error("Failed to auto-fix code");
-  }
-  return response.json();
+export const autoFixCode = async (filename: string, content: string, suggestions: string[]): Promise<AutoFixResponse> => {
+    const payload: AutoFixRequest = { filename, content, suggestions };
+    const response = await fetch(`${API_BASE_URL}/auto-fix`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error("Auto-fix failed");
+    return response.json();
 };
 
-export interface CodeAutoFixBatchRequest {
-  filename: string;
-  content: string;
-  selected_suggestions: string[];
-}
-
-export const autoFixCodeBatch = async (files: CodeAutoFixBatchRequest[]): Promise<{ fixed_files: { filename: string, fixed_code: string }[] }> => {
-  const response = await fetch(`${API_BASE_URL}/auto-fix-code-batch`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ files }),
-  });
-  if (!response.ok) {
-    throw new Error("Failed to batch auto-fix code");
-  }
-  return response.json();
+export const autoFixCodeBatch = async (
+    requests: BatchAutoFixRequest[]
+): Promise<BatchAutoFixResponse> => {
+    const response = await fetch(`${API_BASE_URL}/auto-fix-batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files: requests.flatMap(r => r.files) }),
+    });
+    if (!response.ok) throw new Error("Batch auto-fix failed");
+    return response.json();
 };
+
+// Type alias for backward compatibility
+export type CodeAutoFixBatchRequest = BatchAutoFixRequest;

@@ -34,10 +34,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
         try {
             const fileType = file.name.split('.').pop()?.toLowerCase() || '';
             const data = await uploadFile(file);
-            onFileProcessed(data.content, data.filename, selectedCategory, data.images, fileType);
-        } catch (err: any) {
-            setError(`Upload Failed: ${err.message || 'Unknown error. Please check backend logs.'}`);
-            console.error(err);
+            onFileProcessed(data.text, data.filename || file.name, selectedCategory, data.images, fileType);
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            console.error('File upload error:', errorMessage);
+            setError(`Upload Failed: ${errorMessage || 'Unknown error. Please check backend logs.'}`);
         } finally {
             setUploading(false);
         }

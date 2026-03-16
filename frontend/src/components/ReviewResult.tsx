@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { type ReviewResponse } from '../api';
+import type { ReviewResponse, ChecklistItem } from '../api';
 import { CheckCircle, XCircle, AlertTriangle, FileText, ChevronDown, ChevronUp, Edit3, ListChecks, Download, Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -27,7 +27,7 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
     // Calculate counts for each status (case-insensitive, trimmed)
     const statusCounts = useMemo(() => {
         const counts = { Pass: 0, Fail: 0, Warning: 0 };
-        result.checklist.forEach(item => {
+        result.checklist.forEach((item: ChecklistItem) => {
             const status = (item.status || '').trim().toLowerCase();
             if (status === 'pass') counts.Pass++;
             else if (status === 'fail') counts.Fail++;
@@ -56,7 +56,7 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
 
     // Filter checklist items based on selected filters (case-insensitive)
     const filteredChecklist = useMemo(() => {
-        return result.checklist.filter(item => {
+        return result.checklist.filter((item: ChecklistItem) => {
             const itemStatus = (item.status || '').trim().toLowerCase();
             // Match against lowercase filter keys
             return selectedFilters.has(itemStatus);
@@ -65,12 +65,12 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
 
     // Group filtered checklist by section
     const groupedChecklist = useMemo(() => {
-        return filteredChecklist.reduce((acc, current) => {
+        return filteredChecklist.reduce((acc: Record<string, ChecklistItem[]>, current: ChecklistItem) => {
             const section = current.section || 'General';
             if (!acc[section]) acc[section] = [];
             acc[section].push(current);
             return acc;
-        }, {} as Record<string, typeof filteredChecklist>);
+        }, {} as Record<string, ChecklistItem[]>);
     }, [filteredChecklist]);
 
     const handleDownloadReport = () => {
@@ -84,7 +84,7 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
         doc.setTextColor(71, 85, 105);
         doc.text(`Overall Score: ${result.score}/100`, 14, 32);
 
-        const tableData = result.checklist.map(item => [
+        const tableData = result.checklist.map((item: ChecklistItem) => [
             item.section || 'General',
             item.item,
             item.status,
@@ -130,7 +130,7 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
             doc.setFontSize(10);
             doc.setTextColor(71, 85, 105);
 
-            result.suggestions.forEach((suggestion: { type: string; text: string } | string, idx) => {
+            result.suggestions.forEach((suggestion: { type: string; text: string } | string, idx: number) => {
                 const suggestionText = typeof suggestion === 'string' ? suggestion : suggestion.text;
                 const text = `${idx + 1}. ${suggestionText}`;
                 const splitText = doc.splitTextToSize(text, 180);
@@ -275,7 +275,7 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                                     <h4 className="font-bold text-slate-800 pl-2 tracking-wide uppercase text-sm">{section}</h4>
                                 </div>
                                 <div className="divide-y divide-slate-100/80">
-                                    {items.map((item, i) => (
+                                    {items.map((item: ChecklistItem, i: number) => (
                                         <div key={i} className="flex flex-col sm:flex-row items-start gap-4 p-5 bg-white hover:bg-slate-50/80 transition-colors w-full">
                                             <div className="mt-1 flex-shrink-0">
                                                 {item.status === 'Pass' && <CheckCircle className="w-6 h-6 text-emerald-500 drop-shadow-sm" />}
@@ -289,7 +289,7 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                                                         <p className="text-[14px] text-slate-600 mt-1.5 leading-relaxed">
                                                             {/* Only show Page and Slide references for non-Fail items (exclude Section references) */}
                                                             {item.status !== 'Fail' ? (
-                                                                item.comment.split(/(\[Page \d+\]|\[Slide \d+\])/g).map((part, index) => {
+                                                                item.comment.split(/(\[Page \d+\]|\[Slide \d+\])/g).map((part: string, index: number) => {
                                                                     if (part.match(/\[Page \d+\]|\[Slide \d+\]/)) {
                                                                         return (
                                                                             <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 mr-1 shadow-sm">
@@ -346,7 +346,7 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                         animate="show"
                         className="space-y-4 relative z-10"
                     >
-                        {result.suggestions.map((suggestion: { type: string; text: string } | string, idx) => {
+                        {result.suggestions.map((suggestion: { type: string; text: string } | string, idx: number) => {
                             const isObj = typeof suggestion !== 'string';
                             const type = isObj ? (suggestion as { type: string; text: string }).type : 'Unknown';
                             const text = isObj ? (suggestion as { type: string; text: string }).text : (suggestion as string);

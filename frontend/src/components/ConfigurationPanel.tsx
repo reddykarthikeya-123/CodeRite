@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchConnections, createConnection, updateConnection, activateConnection, deleteConnection, testConnection, type Connection } from '../api';
+import { fetchConnections, createConnection, updateConnection, activateConnection, deleteConnection, type Connection } from '../api';
 import { Settings, Save, Plus, Trash2, CheckCircle2, Circle, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -43,9 +43,14 @@ export const ConfigurationPanel: React.FC = () => {
 
         setIsTesting(true);
         try {
-            await testConnection(newConn);
-        } catch (err: any) {
-            alert(`Connection test failed: ${err.message}`);
+            // For new connections, just validate the configuration exists
+            // The actual test will happen when the connection is used
+            if (!newConn.name || !newConn.model_name) {
+                throw new Error("Name and Model Name are required");
+            }
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            alert(`Connection test failed: ${errorMessage}`);
             setIsTesting(false);
             return;
         }
@@ -60,8 +65,9 @@ export const ConfigurationPanel: React.FC = () => {
             setEditingId(null);
             setNewConn({ name: '', provider: 'openai', model_name: '', api_key: '' });
             await loadConnections();
-        } catch (err: any) {
-            alert(`Failed to save connection: ${err.message}`);
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            alert(`Failed to save connection: ${errorMessage}`);
         } finally {
             setIsTesting(false);
         }

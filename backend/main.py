@@ -1,3 +1,9 @@
+"""Main entry point for the Document Scorer API.
+
+This module sets up the FastAPI application, configures CORS, and defines
+the API routes for health checks, checklists, connections, file uploads,
+and AI analysis.
+"""
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -9,8 +15,9 @@ from pydantic import BaseModel
 import json
 import shutil
 import logging
+from config.logging_config import setup_logging
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(message)s")
+setup_logging()
 logger = logging.getLogger(__name__)
 
 from database import engine, Base, get_db
@@ -40,16 +47,20 @@ app.add_middleware(
 async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        
+
     import os
     import platform
     # Auto-inject paths for Windows local execution without terminal restart
     if platform.system() == "Windows":
         win_path = os.environ.get("PATH", "")
-        if "Tesseract-OCR" not in win_path:
-            os.environ["PATH"] += r";C:\Program Files\Tesseract-OCR"
-        if "poppler" not in win_path:
-            os.environ["PATH"] += r";C:\poppler\poppler-24.08.0\Library\bin"
+        # Configurable paths via environment variables with sensible defaults
+        tesseract_path = os.getenv("TESSERACT_PATH", r"C:\Program Files\Tesseract-OCR")
+        poppler_path = os.getenv("POPPLER_PATH", r"C:\poppler\poppler-24.08.0\Library\bin")
+        
+        if "Tesseract-OCR" not in win_path and os.path.exists(tesseract_path):
+            os.environ["PATH"] += os.pathsep + tesseract_path
+        if "poppler" not in win_path and os.path.exists(poppler_path):
+            os.environ["PATH"] += os.pathsep + poppler_path
         
     logger.info("--- Checking System Dependencies ---")
     tesseract_path = shutil.which("tesseract")
@@ -193,7 +204,7 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         import traceback
         err_msg = traceback.format_exc()
-        print(f"Upload Error: {err_msg}")
+        logger.error(f"Upload Error: {err_msg}")
         raise HTTPException(status_code=500, detail=str(err_msg))
 
 @app.post("/api/analyze")

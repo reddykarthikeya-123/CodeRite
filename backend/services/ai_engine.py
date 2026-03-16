@@ -8,6 +8,10 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 import json
 import os
+import logging
+from config.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class ChecklistItem(BaseModel):
     section: str = Field(description="The section this item belongs to")
@@ -45,7 +49,16 @@ class CodeAutoFixBatchResponse(BaseModel):
     fixed_files: List[FixedCodeFile] = Field(description="List of fixed code files")
 
 class AIEngine:
+    """Engine for interacting with various AI providers (OpenAI, Ollama, Gemini)."""
+
     def __init__(self, provider: str = "ollama", model_name: str = "llama3", api_key: str = None):
+        """Initializes the AI Engine with the specified provider and model.
+
+        Args:
+            provider: The AI provider to use ('openai', 'ollama', or 'gemini').
+            model_name: The name of the model to use.
+            api_key: The API key for the provider, if required.
+        """
         self.provider = provider
         self.model_name = model_name
         self.api_key = api_key
@@ -53,6 +66,14 @@ class AIEngine:
         self.parser = JsonOutputParser(pydantic_object=ReviewResponse)
 
     def _get_llm(self):
+        """Internal method to instantiate the correct LangChain Chat Model.
+
+        Returns:
+            An instance of ChatOpenAI, ChatOllama, or ChatGoogleGenerativeAI.
+
+        Raises:
+            ValueError: If the provider is unsupported or required configuration is missing.
+        """
         if self.provider == "openai":
             if not self.api_key:
                 raise ValueError("OpenAI API Key is required")
@@ -69,6 +90,14 @@ class AIEngine:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
     async def test_connection(self) -> bool:
+        """Tests the connection to the AI provider.
+
+        Returns:
+            True if the connection is successful.
+
+        Raises:
+            Exception: If the connection fails.
+        """
         try:
             # For a basic test, we just invoke a very simple prompt
             prompt = ChatPromptTemplate.from_messages([("user", "Hello")])
@@ -76,10 +105,22 @@ class AIEngine:
             await chain.ainvoke({})
             return True
         except Exception as e:
-            print(f"Connection test failed: {e}")
+            logger.error(f"Connection test failed: {e}")
             raise Exception(f"{str(e)}")
 
     async def analyze_document(self, text: str, images: List[str] = None, custom_instructions: str = "", document_category: str = None, file_type: str = None) -> dict:
+        """Analyzes a document using the AI model and a target checklist.
+
+        Args:
+            text: The text content of the document.
+            images: A list of base64-encoded images (optional).
+            custom_instructions: Additional instructions for the AI (optional).
+            document_category: The category of the document for checklist lookup.
+            file_type: The extension of the original file.
+
+        Returns:
+            A dictionary containing the review results.
+        """
         from services.checklist_loader import loader
 
         target_checklist = []
@@ -195,11 +236,10 @@ class AIEngine:
             else:
                 final_score = int((score / valid_items) * 100)
                 response["score"] = final_score
-
             return response
         except Exception as e:
             # Fallback or error handling
-            print(f"AI Error: {e}")
+            logger.error(f"AI Error: {e}")
             return {
                 "score": 0,
                 "checklist": [{"section": "General", "item": "AI Analysis", "status": "Fail", "comment": f"Error: {str(e)}"}],
@@ -208,6 +248,14 @@ class AIEngine:
             }
 
     async def analyze_code(self, files: List[dict]) -> dict:
+        """Performs a comprehensive code review on a list of files.
+
+        Args:
+            files: A list of dictionaries, each containing 'filename' and 'content'.
+
+        Returns:
+            A dictionary containing the overall score and individual file reviews.
+        """
         system_prompt = """You are a Principal Software Engineer and an expert Code Reviewer.
         Your task is to analyze the provided source code files for formatting correctness, modularity, error handling, performance issues, and language-specific best practices.
 
@@ -269,7 +317,7 @@ class AIEngine:
                 
             return response
         except Exception as e:
-            print(f"AI Code Analysis Error: {e}")
+            logger.error(f"AI Code Analysis Error: {e}")
             return {
                 "overall_score": 0,
                 "files": [
@@ -283,6 +331,16 @@ class AIEngine:
             }
 
     async def auto_fix_code(self, filename: str, content: str, selected_suggestions: List[str]) -> dict:
+        """Applies selected suggestions to a code file.
+
+        Args:
+            filename: The name of the file to fix.
+            content: The original source code.
+            selected_suggestions: A list of strings describing the improvements to apply.
+
+        Returns:
+            A dictionary containing the fixed_code.
+        """
         system_prompt = """You are an expert Principal Software Engineer. 
         Your task is to take a given piece of source code and rewrite it by applying ONLY the specific improvements requested by the user. Do not make unrelated stylistic changes or restructure code unless it is explicitly part of the selected suggestions.
         
@@ -321,12 +379,20 @@ class AIEngine:
             response = await chain.ainvoke(messages)
             return response
         except Exception as e:
-            print(f"AI Auto-Fix Error: {e}")
+            logger.error(f"AI Auto-Fix Error: {e}")
             return {
                 "fixed_code": f"// Error generating fixed code: {str(e)}\n\n" + content
             }
 
     async def auto_fix_code_batch(self, files: List[dict]) -> dict:
+        """Applies improvements to multiple code files in a single batch.
+
+        Args:
+            files: A list of dictionaries with 'filename', 'content', and 'selected_suggestions'.
+
+        Returns:
+            A dictionary containing a list of fixed files.
+        """
         system_prompt = """You are an expert Principal Software Engineer.
         Your task is to take multiple source code files and rewrite them by applying ONLY the specific improvements requested per file. Do not make unrelated stylistic changes or restructure code unless it is explicitly part of the selected suggestions.
         
@@ -374,7 +440,7 @@ class AIEngine:
             response = await chain.ainvoke(messages)
             return response
         except Exception as e:
-            print(f"AI Batch Auto-Fix Error: {e}")
+            logger.error(f"AI Batch Auto-Fix Error: {e}")
             return {
                 "fixed_files": [
                     {

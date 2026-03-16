@@ -89,9 +89,10 @@ function App() {
     try {
       const result = await analyzeCode(files);
       setCodeReviewResult(result);
-    } catch (err: any) {
-      console.error(err);
-      setUploadError(err.message || "Code analysis failed. Please check the backend and configuration.");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(errorMessage);
+      setUploadError(errorMessage || "Code analysis failed. Please check the backend and configuration.");
     } finally {
       setUploading(false);
     }
@@ -105,7 +106,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-hidden">
       {/* Settings Modal */}
       <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="System Preferences">
         <ConfigurationPanel />
@@ -425,10 +426,11 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
       const fileType = file.name.split('.').pop()?.toLowerCase() || '';
       const { uploadFile } = await import('./api');
       const data = await uploadFile(file);
-      onFileProcessed(data.content, data.filename, selectedCategory, data.images, fileType);
-    } catch (err: any) {
-      onErrorChange(`Upload Failed: ${err.message || 'Unknown error. Please check backend logs.'}`);
-      console.error(err);
+      onFileProcessed(data.text, data.filename || file.name, selectedCategory, data.images, fileType);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      onErrorChange(`Upload Failed: ${errorMessage || 'Unknown error. Please check backend logs.'}`);
+      console.error(errorMessage);
     } finally {
       setUploading(false);
     }

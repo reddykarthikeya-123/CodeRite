@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, FileCode2, Sparkles, AlertTriangle, Download, Loader2, Copy, FileText, GitCompare } from 'lucide-react';
 import { autoFixCode, autoFixCodeBatch, type CodeAutoFixBatchRequest } from '../api';
@@ -26,8 +26,8 @@ interface CodeResultProps {
 }
 
 export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onReset }) => {
-    // Track selected suggestions per file index
-    const [selectedSuggestions, setSelectedSuggestions] = useState<Record<number, Set<number>>>({});
+    // Track selected suggestions per file index as an array for efficient state updates
+    const [selectedSuggestions, setSelectedSuggestions] = useState<Record<number, number[]>>({});
     const [fixingFileIndex, setFixingFileIndex] = useState<number | null>(null);
     const [isBatchFixing, setIsBatchFixing] = useState(false);
     const [fixedCodes, setFixedCodes] = useState<Record<number, string>>({});
@@ -36,21 +36,19 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
     const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
     const [showDiff, setShowDiff] = useState<Record<number, boolean>>({});
 
-    const toggleSuggestion = (fileIdx: number, sugIdx: number) => {
+    const toggleSuggestion = useCallback((fileIdx: number, sugIdx: number) => {
         setSelectedSuggestions(prev => {
-            const currentSet = prev[fileIdx] ? new Set(prev[fileIdx]) : new Set<number>();
-            if (currentSet.has(sugIdx)) {
-                currentSet.delete(sugIdx);
-            } else {
-                currentSet.add(sugIdx);
-            }
-            return { ...prev, [fileIdx]: currentSet };
+            const currentArr = prev[fileIdx] || [];
+            const newArr = currentArr.includes(sugIdx)
+                ? currentArr.filter(i => i !== sugIdx)
+                : [...currentArr, sugIdx];
+            return { ...prev, [fileIdx]: newArr };
         });
-    };
+    }, []);
 
     const handleAutoFix = async (fileIdx: number, filename: string) => {
         const selectedIndices = selectedSuggestions[fileIdx];
-        if (!selectedIndices || selectedIndices.size === 0) return;
+        if (!selectedIndices || selectedIndices.length === 0) return;
 
         const rawFile = rawFiles.find(f => f.filename === filename);
         if (!rawFile) {
@@ -59,7 +57,7 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
         }
 
         const fileResult = result.files[fileIdx];
-        const suggestionsToApply = Array.from(selectedIndices).map(idx => fileResult.suggestions[idx]);
+        const suggestionsToApply = selectedIndices.map(idx => fileResult.suggestions[idx]);
 
         setFixingFileIndex(fileIdx);
         try {
@@ -95,18 +93,20 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
 
         for (const [fileIdxStr, selectedIndices] of Object.entries(selectedSuggestions)) {
             const fileIdx = parseInt(fileIdxStr);
-            if (selectedIndices.size === 0) continue;
+            if (!selectedIndices || selectedIndices.length === 0) continue;
 
             const fileResult = result.files[fileIdx];
             const rawFile = rawFiles.find(f => f.filename === fileResult.filename);
             if (!rawFile) continue;
 
-            const suggestionsToApply = Array.from(selectedIndices).map(idx => fileResult.suggestions[idx]);
+            const suggestionsToApply = selectedIndices.map(idx => fileResult.suggestions[idx]);
 
             batchRequests.push({
-                filename: rawFile.filename,
-                content: rawFile.content,
-                selected_suggestions: suggestionsToApply
+                files: [{
+                    filename: rawFile.filename,
+                    content: rawFile.content,
+                    suggestions: suggestionsToApply
+                }]
             });
         }
 
@@ -121,15 +121,15 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
             const newSelectedSuggestions = { ...selectedSuggestions };
             const newAppliedSuggestions = { ...appliedSuggestions };
 
-            response.fixed_files.forEach(ff => {
+            response.fixed_files.forEach((ff: { filename: string; fixed_code: string }) => {
                 const fileIdx = result.files.findIndex(f => f.filename === ff.filename);
                 if (fileIdx !== -1) {
                     newFixedCodes[fileIdx] = ff.fixed_code;
 
-                    // The batch request object contains the applied suggestions
-                    const req = batchRequests.find(r => r.filename === ff.filename);
-                    if (req) {
-                        newAppliedSuggestions[fileIdx] = req.selected_suggestions;
+                    // Use the suggestions we applied
+                    const fileReq = batchRequests.find(r => r.files.some(f => f.filename === ff.filename));
+                    if (fileReq && fileReq.files.length > 0) {
+                        newAppliedSuggestions[fileIdx] = fileReq.files[0].suggestions;
                     }
 
                     const parts = ff.filename.split('.');
@@ -215,7 +215,7 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
 
             {/* Batch Action Button */}
             <AnimatePresence>
-                {Object.values(selectedSuggestions).filter(set => set.size > 0).length > 1 && (
+                {Object.values(selectedSuggestions).filter(arr => arr.length > 0).length > 1 && (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: -10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -295,14 +295,14 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                                                         onClick={() => toggleSuggestion(idx, sIdx)}
                                                     >
                                                         <div className="mt-0.5 flex-shrink-0 relative flex items-center justify-center">
-                                                            <div className={`w-5 h-5 rounded flex items-center justify-center border transition-all ${selectedSuggestions[idx]?.has(sIdx)
+                                                            <div className={`w-5 h-5 rounded flex items-center justify-center border transition-all ${selectedSuggestions[idx]?.includes(sIdx)
                                                                 ? 'bg-indigo-600 border-indigo-600'
                                                                 : 'border-slate-300 bg-white group-hover:border-indigo-400'
                                                                 }`}>
-                                                                {selectedSuggestions[idx]?.has(sIdx) && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                                                                {selectedSuggestions[idx]?.includes(sIdx) && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
                                                             </div>
                                                         </div>
-                                                        <span className={`text-slate-700 leading-relaxed transition-opacity ${selectedSuggestions[idx]?.has(sIdx) ? 'opacity-100 font-medium' : 'opacity-80'}`}>
+                                                        <span className={`text-slate-700 leading-relaxed transition-opacity ${selectedSuggestions[idx]?.includes(sIdx) ? 'opacity-100 font-medium' : 'opacity-80'}`}>
                                                             {suggestion}
                                                         </span>
                                                     </li>
@@ -310,7 +310,7 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                                             </ul>
 
                                             <AnimatePresence>
-                                                {selectedSuggestions[idx] && selectedSuggestions[idx].size > 0 && (
+                                                {selectedSuggestions[idx] && selectedSuggestions[idx].length > 0 && (
                                                     <motion.div
                                                         initial={{ opacity: 0, height: 0 }}
                                                         animate={{ opacity: 1, height: 'auto' }}
@@ -318,7 +318,7 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                                                         className="mt-6 pt-6 border-t border-slate-100 flex justify-between items-center"
                                                     >
                                                         <span className="text-sm font-medium text-slate-500">
-                                                            {selectedSuggestions[idx].size} suggestion{selectedSuggestions[idx].size > 1 ? 's' : ''} selected
+                                                            {selectedSuggestions[idx].length} suggestion{selectedSuggestions[idx].length > 1 ? 's' : ''} selected
                                                         </span>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleAutoFix(idx, file.filename); }}
