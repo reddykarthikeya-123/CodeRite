@@ -4,7 +4,7 @@ import { ReviewResult } from './components/ReviewResult';
 import { CodeResult, type CodeAnalysisResponse } from './components/CodeResult';
 import { Modal } from './components/Modal';
 import { analyzeDocument, analyzeCode, fetchChecklistCategories, type ReviewResponse } from './api';
-import { Loader2, Settings, ArrowLeft, ListChecks, Upload, FileText, UploadCloud, FileCode2, Code2, Trash2, X, AlertTriangle } from 'lucide-react';
+import { Loader2, Settings, ArrowLeft, ListChecks, Upload, FileText, UploadCloud, FileCode2, Code2, Trash2, X, AlertTriangle, FileUp, HelpCircle, Lightbulb } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function App() {
@@ -21,6 +21,7 @@ function App() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [categories, setCategories] = useState<string[]>([]);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Load categories on mount
   useEffect(() => {
@@ -59,6 +60,14 @@ function App() {
       }
     };
     window.addEventListener('keydown', handleKeyDown);
+    
+    // Check if first-time user
+    const hasVisited = localStorage.getItem('hasVisited');
+    if (!hasVisited) {
+      setShowOnboarding(true);
+      localStorage.setItem('hasVisited', 'true');
+    }
+    
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
@@ -106,14 +115,14 @@ function App() {
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9] text-slate-900 font-sans selection:bg-[#1E40AF]/10 selection:text-[#1E40AF] overflow-hidden">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9] text-slate-900 font-sans selection:bg-[#1E40AF]/10 selection:text-[#1E40AF] overflow-hidden">
       {/* Settings Modal */}
       <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="System Preferences">
         <ConfigurationPanel />
       </Modal>
 
       {/* Header with consistent padding and height */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-50 transition-all h-20">
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-50 transition-all h-20 flex-shrink-0">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 h-full flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/ritelogo.png" alt="RITE Logo" className="w-12 h-12 object-contain" />
@@ -137,7 +146,7 @@ function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12">
+      <main className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12 flex-1 flex flex-col justify-center">
         <AnimatePresence mode="wait">
           {!currentFile && !uploading && !docReviewResult && !codeReviewResult && (
             // Upload view container with entrance animation
@@ -147,20 +156,20 @@ function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20, filter: "blur(10px)" }}
               transition={{ duration: 0.5, ease: "easeOut" }}
-              className="flex items-start justify-center py-8"
+              className="flex items-center justify-center py-4"
             >
-              {/* Two-pane layout with 16px gap, aligned at top */}
-              <div className="flex w-full gap-16 max-w-6xl items-start">
+              {/* Two-pane layout with aligned elements */}
+              <div className="flex w-full gap-16">
                 {/* Left Pane - Info & Controls */}
                 <motion.div
-                  className="flex-1 min-w-[380px] max-w-[520px]"
+                  className="flex-1 min-w-[380px] max-w-[480px]"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.1 }}
                 >
-                  <div className="sticky top-32">
-                    {/* App Mode Toggle - centered with proper spacing */}
-                    <div className="flex justify-center mb-12">
+                  <div className="w-full h-[580px] flex flex-col justify-between">
+                    {/* App Mode Toggle - centered at the top */}
+                    <div className="flex justify-center">
                       <div className="flex bg-slate-200/50 p-1.5 rounded-full relative border border-slate-200 shadow-inner w-fit">
                         <div
                           className="absolute inset-y-1.5 left-1.5 w-[calc(50%-6px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-in-out"
@@ -168,9 +177,9 @@ function App() {
                         />
                         <button
                           onClick={() => setAppMode('document')}
-                          className={`flex-1 py-2.5 px-6 text-sm font-bold relative z-10 transition-colors rounded-full ${
-                            appMode === 'document' 
-                              ? 'text-[#1E40AF]' 
+                          className={`flex-1 py-2.5 px-8 text-sm font-bold relative z-10 transition-colors rounded-full ${
+                            appMode === 'document'
+                              ? 'text-[#1E40AF]'
                               : 'text-slate-500 hover:text-slate-700'
                           }`}
                         >
@@ -178,9 +187,9 @@ function App() {
                         </button>
                         <button
                           onClick={() => setAppMode('code')}
-                          className={`flex-1 py-2.5 px-6 text-sm font-bold relative z-10 transition-colors rounded-full ${
-                            appMode === 'code' 
-                              ? 'text-[#1E40AF]' 
+                          className={`flex-1 py-2.5 px-8 text-sm font-bold relative z-10 transition-colors rounded-full ${
+                            appMode === 'code'
+                              ? 'text-[#1E40AF]'
                               : 'text-slate-500 hover:text-slate-700'
                           }`}
                         >
@@ -189,43 +198,41 @@ function App() {
                       </div>
                     </div>
 
-                    {/* Title & Description with proper vertical spacing */}
-                    {/* Title baseline aligned with upload card top */}
-                    <div className="text-center mb-8">
+                    {/* Title & Description centered vertically */}
+                    <div className="text-center py-8">
                       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#3B82F6]/5 rounded-full blur-[80px] pointer-events-none"></div>
                       <h2 className="text-4xl lg:text-5xl font-black text-slate-900 mb-4 tracking-tighter relative z-10 leading-[1.2]">
-                        {appMode === 'document' ? 'Intelligent Document' : 'Automated Code'} <br /> 
+                        {appMode === 'document' ? 'Intelligent Document' : 'Automated Code'} <br />
                         {appMode === 'document' ? 'Quality Assurance' : 'Review & Scoring'}
                       </h2>
-                      <p className="text-lg text-slate-500 leading-relaxed relative z-10 font-medium max-w-xl mx-auto">
+                      <p className="text-lg text-slate-600 leading-relaxed relative z-10 font-medium max-w-xl mx-auto">
                         {appMode === 'document'
                           ? 'Instantly validate functional designs, requirements, and test scripts against strict enterprise compliance frameworks using AI.'
                           : 'Analyze source code for formatting correctness, modularity, error handling, and language-specific best practices.'}
                       </p>
                     </div>
 
-                    {/* Framework/Checklist Selector (Document mode only) */}
-                    {/* Aligned with "Drag & drop" text top */}
-                    {appMode === 'document' && (
-                      <div className="mt-8">
+                    {/* Framework/Checklist Selector (Document mode only) - at the bottom */}
+                    <div className="h-[150px] flex flex-col justify-end">
+                      {appMode === 'document' && (
                         <FileUploadSelector
                           selectedCategory={selectedCategory}
                           onCategoryChange={setSelectedCategory}
                           categories={categories}
                         />
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </motion.div>
 
                 {/* Right Pane - Upload Area */}
                 <motion.div
-                  className="flex-1 min-w-[380px]"
+                  className="flex-1 min-w-[380px] max-w-[480px]"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 }}
                 >
-                  <div className="sticky top-32 flex items-center h-full w-full">
+                  <div className="w-full h-[580px] flex flex-col justify-center">
                     <AnimatePresence mode="wait">
                       {appMode === 'document' ? (
                         <motion.div
@@ -233,7 +240,7 @@ function App() {
                           initial={{ opacity: 0, scale: 0.98 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.98 }}
-                          className="w-full"
+                          className="h-full"
                         >
                           <FileUploadDropzone
                             onFileProcessed={handleFileProcessed}
@@ -250,7 +257,7 @@ function App() {
                           initial={{ opacity: 0, scale: 0.98 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.98 }}
-                          className="w-full"
+                          className="h-full"
                         >
                           <CodeUploadDropzone
                             onCodeProcessed={handleCodeProcessed}
@@ -347,6 +354,52 @@ function App() {
           )}
         </AnimatePresence>
       </main>
+
+      {/* Onboarding Modal for First-Time Users */}
+      <Modal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} title="Welcome to Inspectra AI!">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-[#1E40AF]/5 to-[#06B6D4]/5 rounded-xl border border-[#1E40AF]/10">
+            <Lightbulb className="w-6 h-6 text-[#1E40AF] flex-shrink-0" />
+            <div>
+              <h4 className="font-bold text-slate-800 text-sm">AI-Powered Document Auditing</h4>
+              <p className="text-xs text-slate-600 mt-1">Validate functional designs, requirements, and test scripts against enterprise compliance frameworks.</p>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <h5 className="font-bold text-slate-700 text-sm">How it works:</h5>
+            <div className="space-y-2">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-[#1E40AF] text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
+                <p className="text-sm text-slate-600">Select a compliance framework from the dropdown</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-[#1E40AF] text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
+                <p className="text-sm text-slate-600">Drag & drop your document or click to browse</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-[#1E40AF] text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
+                <p className="text-sm text-slate-600">Get instant AI-powered quality assessment and feedback</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <FileText className="w-5 h-5 text-[#3B82F6] flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-slate-700">Supported Formats</p>
+              <p className="text-xs text-slate-500">PDF, DOCX, XLSX, CSV, PPTX</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowOnboarding(false)}
+            className="w-full py-3 bg-gradient-to-r from-[#1E3A8A] via-[#3B82F6] to-[#06B6D4] text-white font-bold rounded-xl hover:shadow-lg hover:shadow-[#3B82F6]/30 transition-all"
+          >
+            Get Started
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -373,7 +426,7 @@ const FileUploadSelector: React.FC<FileUploadSelectorProps> = ({
     >
       {/* Subtle gradient background using brand colors */}
       <div className="absolute inset-0 bg-gradient-to-r from-[#1E40AF]/5 to-[#06B6D4]/5 rounded-2xl blur-xl" />
-      <div className="relative bg-white/80 backdrop-blur-xl p-5 rounded-2xl shadow-md hover:shadow-lg transition-shadow duration-200 border border-slate-200/60">
+      <div className="relative bg-white/90 backdrop-blur-xl p-6 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-200 border border-slate-200/60">
         <label className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-3 tracking-wide normal-case">
           <ListChecks className="w-5 h-5 text-[#1E40AF]" />
           Target Framework / Checklist
@@ -382,9 +435,10 @@ const FileUploadSelector: React.FC<FileUploadSelectorProps> = ({
           <select
             value={selectedCategory}
             onChange={(e) => onCategoryChange(e.target.value)}
-            className="w-full px-5 py-3.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] outline-none transition-all shadow-inner text-slate-700 font-medium appearance-none cursor-pointer hover:border-[#3B82F6]/50"
+            className="w-full px-5 py-3.5 bg-slate-50/50 border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] outline-none transition-all shadow-inner text-slate-700 font-medium appearance-none cursor-pointer hover:border-[#3B82F6]/50"
+            aria-label="Select audit framework or checklist"
           >
-            <option value="" disabled>Select the audit document</option>
+            <option value="" disabled>Select a compliance framework or checklist</option>
             {categories.map((cat, idx) => (
               <option key={idx} value={cat}>{cat}</option>
             ))}
@@ -395,6 +449,10 @@ const FileUploadSelector: React.FC<FileUploadSelectorProps> = ({
             </svg>
           </div>
         </div>
+        <p className="text-xs text-slate-500 mt-2.5 flex items-center gap-1.5">
+          <HelpCircle className="w-3.5 h-3.5" />
+          Choose the compliance framework to validate your document against
+        </p>
       </div>
     </motion.div>
   );
@@ -461,13 +519,13 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
   };
 
   return (
-    <div className="w-full min-w-[420px] h-[520px] bg-white rounded-2xl shadow-md border border-slate-100 p-8 flex flex-col relative overflow-hidden group">
+    <div className="w-full min-w-[420px] h-[580px] bg-white rounded-2xl shadow-lg border border-slate-100 p-6 flex flex-col relative overflow-hidden group">
       {/* Dashed upload zone fills entire card */}
       <motion.div
-        className={`flex flex-col items-center justify-center relative overflow-hidden border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 h-full ${
+        className={`flex flex-col items-center justify-center relative overflow-hidden border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 h-full ${
           isDragging
             ? 'border-[#3B82F6] bg-gradient-to-br from-[#1E40AF]/5 via-[#3B82F6]/5 to-[#06B6D4]/5 shadow-2xl shadow-[#1E40AF]/20 scale-[1.02]'
-            : 'border-[#CBD5E1] hover:border-[#3B82F6] hover:bg-gradient-to-br hover:from-[#1E40AF]/5 hover:via-[#3B82F6]/5 hover:to-[#06B6D4]/5 hover:shadow-lg hover:shadow-[#3B82F6]/10'
+            : 'border-slate-200 hover:border-[#3B82F6] hover:bg-gradient-to-br hover:from-[#1E40AF]/5 hover:via-[#3B82F6]/5 hover:to-[#06B6D4]/5 hover:shadow-lg hover:shadow-[#3B82F6]/10'
         }`}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
@@ -475,6 +533,9 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
         onClick={() => fileInputRef.current?.click()}
         whileHover={{ y: -3 }}
         whileTap={{ scale: 0.98 }}
+        role="button"
+        tabIndex={0}
+        aria-label="Upload document area. Drag and drop or click to browse files."
       >
         <input
           type="file"
@@ -490,7 +551,7 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
             <p className="text-slate-600 font-semibold tracking-wide">Processing Document...</p>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center relative z-10 h-full">
+          <div className="flex flex-col items-center justify-center relative z-10">
             {/* Icon container with brand gradient and enhanced shadow */}
             <motion.div
               className="p-4 bg-gradient-to-br from-[#1E3A8A] via-[#3B82F6] to-[#06B6D4] rounded-full shadow-lg shadow-[#3B82F6]/30 mb-5 group-hover:shadow-xl group-hover:shadow-[#3B82F6]/40"
@@ -517,20 +578,39 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
               </span>
             </p>
 
-            {/* File formats - text-sm to match note below */}
-            <p className="text-slate-500 text-xs mt-2 font-medium text-center max-w-xs">
-              Supports PDFs, Word Docs (.docx), Excel (.xlsx, .csv), and PowerPoint (.pptx)
+            {/* File format icons with labels */}
+            <div className="flex gap-3 justify-center flex-wrap max-w-xs mx-auto mb-3">
+              {[
+                { ext: 'PDF', color: 'text-red-600', bg: 'bg-red-50' },
+                { ext: 'DOCX', color: 'text-blue-600', bg: 'bg-blue-50' },
+                { ext: 'XLSX', color: 'text-green-600', bg: 'bg-green-50' },
+                { ext: 'PPTX', color: 'text-orange-600', bg: 'bg-orange-50' },
+              ].map((format) => (
+                <motion.div
+                  key={format.ext}
+                  className={`px-3 py-1.5 ${format.bg} rounded-lg border border-slate-200 shadow-sm`}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <span className={`text-xs font-bold ${format.color}`}>{format.ext}</span>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* File size hint */}
+            <p className="text-slate-500 text-xs font-medium flex items-center gap-1.5 mb-1.5">
+              <FileUp className="w-3.5 h-3.5" />
+              Max file size: 50MB
             </p>
 
             {/* Note - text-xs to be slightly smaller */}
-            <p className="text-slate-400 text-[11px] mt-1">
+            <p className="text-slate-400 text-[11px]">
               Embedded flowcharts and screenshots are automatically graded via AI Vision.
             </p>
           </div>
         )}
       </motion.div>
-
-      {/* No bottom spacer needed */}
 
       <AnimatePresence>
         {error && (
@@ -662,7 +742,7 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
   };
 
   return (
-    <div className="w-full min-w-[420px] h-[520px] bg-white rounded-2xl shadow-md border border-slate-100 p-8 flex flex-col relative overflow-hidden group">
+    <div className="w-full min-w-[420px] h-[580px] bg-white rounded-2xl shadow-lg border border-slate-100 p-6 flex flex-col relative overflow-hidden group">
       <AnimatePresence>
         {error && (
           <motion.div
@@ -685,26 +765,28 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Tab switcher with brand colors - reduced bottom margin for tighter layout */}
-      <div className="flex bg-slate-100 p-1 rounded-xl mb-3 relative flex-shrink-0 z-10 h-[44px]">
+      {/* Tab switcher with brand colors and icons - improved differentiation */}
+      <div className="flex bg-slate-100 p-1 rounded-xl mb-4 relative flex-shrink-0 z-10 h-[48px]">
         <div
-          className="absolute inset-y-1 w-1/2 bg-white rounded-lg shadow-sm transition-transform duration-300 ease-in-out"
+          className="absolute inset-y-1 w-1/2 bg-white rounded-lg shadow-sm transition-transform duration-300 ease-in-out border border-slate-200/50"
           style={{ transform: `translateX(${activeTab === 'paste' ? 'calc(100% - 4px)' : '4px'})` }}
         />
         <button
           onClick={() => setActiveTab('files')}
-          className={`flex-1 py-2 text-sm font-bold relative z-10 transition-colors ${
+          className={`flex-1 py-2 text-sm font-bold relative z-10 transition-colors flex items-center justify-center gap-2 ${
             activeTab === 'files' ? 'text-[#1E40AF]' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
+          <FileCode2 className="w-4 h-4" />
           Upload Files
         </button>
         <button
           onClick={() => setActiveTab('paste')}
-          className={`flex-1 py-2 text-sm font-bold relative z-10 transition-colors ${
+          className={`flex-1 py-2 text-sm font-bold relative z-10 transition-colors flex items-center justify-center gap-2 ${
             activeTab === 'paste' ? 'text-[#1E40AF]' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
+          <Code2 className="w-4 h-4" />
           Paste Code
         </button>
       </div>
@@ -721,14 +803,17 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
               className="flex-1 flex flex-col overflow-hidden w-full h-full"
             >
               <div
-                className={`flex-1 flex flex-col items-center justify-center relative border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-300 ease-out cursor-pointer
+                className={`flex-1 flex flex-col items-center justify-center relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 ease-out cursor-pointer
                 ${isDragging
-                    ? 'border-[#3B82F6] bg-[#3B82F6]/5 scale-[1.02] shadow-inner'
-                    : 'border-slate-200 hover:border-[#3B82F6] hover:bg-slate-50/50'}`}
+                    ? 'border-[#3B82F6] bg-gradient-to-br from-[#1E40AF]/5 via-[#3B82F6]/5 to-[#06B6D4]/5 scale-[1.02] shadow-lg shadow-[#3B82F6]/20'
+                    : 'border-slate-200 hover:border-[#3B82F6] hover:bg-slate-50/70 hover:shadow-md'}`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                aria-label="Upload code files area. Drag and drop or click to browse files."
               >
                 <input
                   ref={fileInputRef}
@@ -737,60 +822,69 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
                   className="hidden"
                   onChange={handleFileInput}
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/20 pointer-events-none rounded-2xl" />
 
                 <div className="relative z-10">
-                  {/* Icon container with brand colors */}
-                  <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 transition-all duration-300
-                  ${isDragging ? 'bg-[#3B82F6]/10 text-[#1E40AF] scale-110' : 'bg-slate-100 text-slate-400 group-hover:bg-[#1E40AF]/5 group-hover:text-[#1E40AF]'}`}>
+                  {/* Icon container with brand colors and animation */}
+                  <motion.div
+                    className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-5 transition-all duration-300
+                  ${isDragging ? 'bg-[#3B82F6]/10 text-[#1E40AF] scale-110' : 'bg-slate-100 text-slate-400 group-hover:bg-gradient-to-br group-hover:from-[#1E40AF]/5 group-hover:to-[#06B6D4]/5 group-hover:text-[#1E40AF]'}`}
+                    animate={!isDragging ? { scale: [1, 1.05, 1] } : {}}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  >
                     <FileCode2 className={`w-10 h-10 ${isDragging ? 'animate-bounce' : ''}`} />
-                  </div>
+                  </motion.div>
 
                   <h3 className="text-xl font-bold text-slate-800 tracking-tight mb-2">
                     Drop code files here
                   </h3>
-                  <p className="text-slate-500 mb-6 font-medium">
+                  <p className="text-slate-500 mb-5 font-medium">
                     or click to browse from your computer
                   </p>
 
                   {/* File type badges with brand colors */}
                   <motion.div
-                    className="flex gap-2 justify-center flex-wrap max-w-sm mx-auto opacity-0 sm:opacity-100"
+                    className="flex gap-2 justify-center flex-wrap max-w-sm mx-auto mb-4"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.3 }}
                   >
-                    {['.py', '.js', '.ts', '.java', '.cpp', '.cs', '.go', '.html', '.css', '...'].map((ext, index) => (
+                    {['.py', '.js', '.ts', '.java', '.cpp', '.cs', '.go', '.html', '.css'].map((ext, index) => (
                       <motion.span
                         key={ext}
-                        className="px-2 py-1 bg-[#F1F5F9] text-[#475569] rounded text-xs font-semibold tracking-wide border border-[#E2E8F0] shadow-sm"
+                        className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] rounded-lg text-xs font-semibold tracking-wide border border-[#E2E8F0] shadow-sm hover:bg-[#1E40AF]/5 hover:text-[#1E40AF] hover:border-[#1E40AF]/30 transition-colors"
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05, duration: 0.2 }}
+                        transition={{ delay: index * 0.04, duration: 0.2 }}
                       >
                         {ext}
                       </motion.span>
                     ))}
                   </motion.div>
+                  
+                  {/* File size hint */}
+                  <p className="text-slate-400 text-xs font-medium flex items-center gap-1.5 justify-center">
+                    <FileUp className="w-3.5 h-3.5" />
+                    Max 5MB per file
+                  </p>
                 </div>
               </div>
 
               {selectedFiles.length > 0 && (
-                <div className="mt-4 flex-shrink-0">
-                  <h4 className="text-sm font-bold text-slate-700 mb-2 uppercase tracking-wider">Selected Files</h4>
-                  <div className="space-y-2 max-h-24 overflow-y-auto pr-2 custom-scrollbar">
+                <div className="mt-3 flex-shrink-0">
+                  <h4 className="text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">Selected Files</h4>
+                  <div className="space-y-1.5 max-h-20 overflow-y-auto pr-2 custom-scrollbar">
                     {selectedFiles.map((f, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 group/item">
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          <Code2 className="w-5 h-5 text-[#3B82F6] flex-shrink-0" />
+                      <div key={i} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200 group/item">
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          <Code2 className="w-4 h-4 text-[#3B82F6] flex-shrink-0" />
                           <span className="text-sm font-medium text-slate-700 truncate">{f.file.name}</span>
                           <span className="text-xs text-slate-400">({(f.file.size / 1024).toFixed(1)} KB)</span>
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); removeFile(i); }}
-                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover/item:opacity-100"
+                          className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover/item:opacity-100"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ))}
@@ -811,7 +905,7 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
                 value={pastedCode}
                 onChange={(e) => setPastedCode(e.target.value)}
                 placeholder="Paste your source code here for analysis..."
-                className="flex-1 w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-6 font-mono text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-[#3B82F6]/10 focus:border-[#3B82F6] resize-none custom-scrollbar shadow-inner"
+                className="flex-1 w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-5 font-mono text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-[#3B82F6]/10 focus:border-[#3B82F6] resize-none custom-scrollbar shadow-inner"
                 spellCheck={false}
               />
             </motion.div>
@@ -819,14 +913,14 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
         </AnimatePresence>
       </div>
 
-      {/* Submit button with brand colors - reduced margin for tighter layout */}
-      <div className="mt-4 flex justify-end relative z-10 flex-shrink-0 h-[48px]">
+      {/* Submit button with brand colors */}
+      <div className="mt-3 flex justify-end relative z-10 flex-shrink-0">
         <button
           onClick={handleSubmit}
           disabled={activeTab === 'files' ? selectedFiles.length === 0 : pastedCode.trim().length === 0}
-          className="flex items-center gap-2 bg-gradient-to-r from-[#1E3A8A] via-[#3B82F6] to-[#06B6D4] text-white px-8 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-[#3B82F6]/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:hover:translate-y-0"
+          className="flex items-center gap-2 bg-gradient-to-r from-[#1E3A8A] via-[#3B82F6] to-[#06B6D4] text-white px-6 py-2.5 rounded-xl font-bold hover:shadow-lg hover:shadow-[#3B82F6]/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:hover:translate-y-0"
         >
-          <UploadCloud className="w-5 h-5" />
+          <UploadCloud className="w-4 h-4" />
           Analyze Code
         </button>
       </div>
