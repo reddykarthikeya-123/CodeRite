@@ -62,14 +62,14 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleFileProcessed = async (content: string, filename: string, category: string, images?: string[]) => {
+  const handleFileProcessed = async (content: string, filename: string, category: string, images?: string[], fileType?: string) => {
     setCurrentFile({ content, filename });
     setDocReviewResult(null);
     setCodeReviewResult(null);
     setUploading(true);
 
     try {
-      const result = await analyzeDocument(content, "", category, images);
+      const result = await analyzeDocument(content, "", category, images, fileType);
       setDocReviewResult({ ...result, filename });
     } catch (err) {
       console.error(err);
@@ -394,7 +394,7 @@ const FileUploadSelector: React.FC<FileUploadSelectorProps> = ({
 
 // FileUploadDropzone Component - Right pane document upload
 interface FileUploadDropzoneProps {
-  onFileProcessed: (content: string, filename: string, category: string, images?: string[]) => void;
+  onFileProcessed: (content: string, filename: string, category: string, images?: string[], fileType?: string) => void;
   uploading: boolean;
   setUploading: (uploading: boolean) => void;
   error: string | null;
@@ -422,9 +422,10 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
     setUploading(true);
     onErrorChange(null);
     try {
+      const fileType = file.name.split('.').pop()?.toLowerCase() || '';
       const { uploadFile } = await import('./api');
       const data = await uploadFile(file);
-      onFileProcessed(data.content, data.filename, selectedCategory, data.images);
+      onFileProcessed(data.content, data.filename, selectedCategory, data.images, fileType);
     } catch (err: any) {
       onErrorChange(`Upload Failed: ${err.message || 'Unknown error. Please check backend logs.'}`);
       console.error(err);
