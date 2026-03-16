@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+/* Brand Color CSS Variables */
+:root {
+  /* Primary Brand Colors */
+  --brand-primary-royal: #1E40AF;
+  --brand-primary-deep: #1E3A8A;
+  --brand-primary-bright: #3B82F6;
+  
+  /* Secondary Brand Colors */
+  --brand-secondary-cyan: #06B6D4;
+  --brand-secondary-base: #0891B2;
+  
+  /* Neutral Slate Scale */
+  --neutral-50: #F8FAFC;
+  --neutral-100: #F1F5F9;
+  --neutral-200: #E2E8F0;
+  --neutral-300: #CBD5E1;
+  --neutral-400: #94A3B8;
+  --neutral-500: #64748B;
+  --neutral-600: #475569;
+  --neutral-700: #334155;
+  --neutral-800: #1E293B;
+  --neutral-900: #0F172A;
+}
+
 html, body {
   overflow: hidden;
   height: 100vh;
@@ -7,5 +31,40 @@ html, body {
 }
 
 body {
-  background-color: #f9fafb;
+  background-color: var(--neutral-50);
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--neutral-100);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--neutral-300);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--neutral-400);
+}
+
+/* Shimmer Animation */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Focus Ring Utility */
+.focus-ring-brand {
+  @apply focus:outline-none focus:ring-4 focus:ring-[#3B82F6]/20;
 }

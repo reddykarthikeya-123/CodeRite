@@ -105,7 +105,7 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
     };
 
     return (
-        <div className="w-full min-w-[420px] h-[580px] bg-white rounded-3xl shadow-xl border border-slate-100 p-8 flex flex-col relative overflow-hidden group">
+        <div className="w-full min-w-[420px] h-[520px] bg-white rounded-2xl shadow-md border border-slate-100 p-8 flex flex-col relative overflow-hidden group">
             {/* Error Notification */}
             <AnimatePresence>
                 {error && (
@@ -129,7 +129,8 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
                 )}
             </AnimatePresence>
 
-            <div className="flex bg-slate-100 p-1 rounded-xl mb-4 relative flex-shrink-0 z-10 h-[44px]">
+            {/* Tab switcher - reduced bottom margin for tighter layout */}
+            <div className="flex bg-slate-100 p-1 rounded-xl mb-3 relative flex-shrink-0 z-10 h-[44px]">
                 <div
                     className="absolute inset-y-1 w-1/2 bg-white rounded-lg shadow-sm transition-transform duration-300 ease-in-out"
                     style={{ transform: `translateX(${activeTab === 'paste' ? 'calc(100% - 4px)' : '4px'})` }}
@@ -245,11 +246,12 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
                 </AnimatePresence>
             </div>
 
-            <div className="mt-6 flex justify-end relative z-10 flex-shrink-0 h-[54px]">
+            {/* Submit button - reduced margin for tighter layout */}
+            <div className="mt-4 flex justify-end relative z-10 flex-shrink-0 h-[48px]">
                 <button
                     onClick={handleSubmit}
                     disabled={activeTab === 'files' ? selectedFiles.length === 0 : pastedCode.trim().length === 0}
-                    className="flex items-center gap-2 bg-indigo-600 text-white px-8 py-3.5 rounded-xl font-bold hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600 disabled:hover:shadow-none disabled:hover:translate-y-0"
+                    className="flex items-center gap-2 bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600 disabled:hover:shadow-none disabled:hover:translate-y-0"
                 >
                     <UploadCloud className="w-5 h-5" />
                     Analyze Code

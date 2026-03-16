@@ -106,17 +106,18 @@ function App() {
   };
 
   return (
-    <div className="h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9] text-slate-900 font-sans selection:bg-[#1E40AF]/10 selection:text-[#1E40AF] overflow-hidden">
       {/* Settings Modal */}
       <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="System Preferences">
         <ConfigurationPanel />
       </Modal>
 
-      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-50 transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      {/* Header with consistent padding and height */}
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-50 transition-all h-20">
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 h-full flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/ritelogo.png" alt="RITE Logo" className="w-12 h-12 object-contain" />
-            <h1 className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-900 tracking-tight">
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
               Inspectra AI
             </h1>
           </div>
@@ -125,7 +126,7 @@ function App() {
             {import.meta.env.VITE_HIDE_SETTINGS_BUTTON !== 'true' && (
               <button
                 onClick={() => setIsSettingsOpen(true)}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-200 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-[#1E40AF] hover:border-[#1E40AF]/30 transition-all focus:outline-none focus:ring-4 focus:ring-[#3B82F6]/20 shadow-sm"
                 title="Settings (Cmd/Ctrl + ,)"
               >
                 <Settings className="w-4 h-4" />
@@ -136,19 +137,20 @@ function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12">
         <AnimatePresence mode="wait">
           {!currentFile && !uploading && !docReviewResult && !codeReviewResult && (
+            // Upload view container with entrance animation
             <motion.div
               key="upload"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20, filter: "blur(10px)" }}
-              transition={{ duration: 0.4, ease: "easeInOut" }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
               className="flex items-start justify-center py-8"
             >
-              {/* Two-pane layout with separator */}
-              <div className="flex w-full gap-8 max-w-6xl items-stretch">
+              {/* Two-pane layout with 16px gap, aligned at top */}
+              <div className="flex w-full gap-16 max-w-6xl items-start">
                 {/* Left Pane - Info & Controls */}
                 <motion.div
                   className="flex-1 min-w-[380px] max-w-[520px]"
@@ -157,8 +159,8 @@ function App() {
                   transition={{ delay: 0.1 }}
                 >
                   <div className="sticky top-32">
-                    {/* App Mode Toggle */}
-                    <div className="flex justify-center mb-10">
+                    {/* App Mode Toggle - centered with proper spacing */}
+                    <div className="flex justify-center mb-12">
                       <div className="flex bg-slate-200/50 p-1.5 rounded-full relative border border-slate-200 shadow-inner w-fit">
                         <div
                           className="absolute inset-y-1.5 left-1.5 w-[calc(50%-6px)] bg-white rounded-full shadow-sm transition-transform duration-300 ease-in-out"
@@ -166,24 +168,34 @@ function App() {
                         />
                         <button
                           onClick={() => setAppMode('document')}
-                          className={`flex-1 py-2.5 px-6 text-sm font-bold relative z-10 transition-colors rounded-full ${appMode === 'document' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                          className={`flex-1 py-2.5 px-6 text-sm font-bold relative z-10 transition-colors rounded-full ${
+                            appMode === 'document' 
+                              ? 'text-[#1E40AF]' 
+                              : 'text-slate-500 hover:text-slate-700'
+                          }`}
                         >
                           Document Audit
                         </button>
                         <button
                           onClick={() => setAppMode('code')}
-                          className={`flex-1 py-2.5 px-6 text-sm font-bold relative z-10 transition-colors rounded-full ${appMode === 'code' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                          className={`flex-1 py-2.5 px-6 text-sm font-bold relative z-10 transition-colors rounded-full ${
+                            appMode === 'code' 
+                              ? 'text-[#1E40AF]' 
+                              : 'text-slate-500 hover:text-slate-700'
+                          }`}
                         >
                           Code Review
                         </button>
                       </div>
                     </div>
 
-                    {/* Title & Description */}
-                    <div className="text-center mb-10">
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none"></div>
-                      <h2 className="text-4xl lg:text-5xl font-black text-slate-900 mb-6 tracking-tighter relative z-10 leading-[1.15]">
-                        {appMode === 'document' ? 'Intelligent Document' : 'Automated Code'} <br /> {appMode === 'document' ? 'Quality Assurance' : 'Review & Scoring'}
+                    {/* Title & Description with proper vertical spacing */}
+                    {/* Title baseline aligned with upload card top */}
+                    <div className="text-center mb-8">
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#3B82F6]/5 rounded-full blur-[80px] pointer-events-none"></div>
+                      <h2 className="text-4xl lg:text-5xl font-black text-slate-900 mb-4 tracking-tighter relative z-10 leading-[1.2]">
+                        {appMode === 'document' ? 'Intelligent Document' : 'Automated Code'} <br /> 
+                        {appMode === 'document' ? 'Quality Assurance' : 'Review & Scoring'}
                       </h2>
                       <p className="text-lg text-slate-500 leading-relaxed relative z-10 font-medium max-w-xl mx-auto">
                         {appMode === 'document'
@@ -193,8 +205,9 @@ function App() {
                     </div>
 
                     {/* Framework/Checklist Selector (Document mode only) */}
+                    {/* Aligned with "Drag & drop" text top */}
                     {appMode === 'document' && (
-                      <div className="mt-10">
+                      <div className="mt-8">
                         <FileUploadSelector
                           selectedCategory={selectedCategory}
                           onCategoryChange={setSelectedCategory}
@@ -204,15 +217,6 @@ function App() {
                     )}
                   </div>
                 </motion.div>
-
-                {/* Vertical Dotted Separator */}
-                <div className="relative flex items-stretch justify-center px-4">
-                  <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 flex flex-col items-center justify-center gap-1">
-                    {Array.from({ length: 40 }).map((_, i) => (
-                      <div key={i} className="w-px h-2 bg-slate-300 rounded-full"></div>
-                    ))}
-                  </div>
-                </div>
 
                 {/* Right Pane - Upload Area */}
                 <motion.div
@@ -271,9 +275,9 @@ function App() {
               className="flex flex-col items-center justify-center min-h-[60vh]"
             >
               <div className="relative">
-                <div className="absolute inset-0 bg-indigo-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
-                <div className="bg-white p-6 rounded-full shadow-xl relative z-10 mb-8 border border-indigo-50">
-                  <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+                <div className="absolute inset-0 bg-[#3B82F6]/10 rounded-full blur-xl opacity-20 animate-pulse"></div>
+                <div className="bg-white p-6 rounded-full shadow-xl relative z-10 mb-8 border border-[#3B82F6]/10">
+                  <Loader2 className="w-12 h-12 text-[#1E40AF] animate-spin" />
                 </div>
               </div>
               <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Auditing {currentFile?.filename}...</h3>
@@ -291,14 +295,14 @@ function App() {
                 </motion.p>
               </AnimatePresence>
 
-              {/* Enhanced Progress Bar */}
+              {/* Enhanced Progress Bar with brand colors */}
               <div className="w-full max-w-xs mt-8 h-1.5 bg-slate-100 rounded-full overflow-hidden relative">
-                <div className="absolute inset-0 bg-indigo-500/10 animate-pulse"></div>
+                <div className="absolute inset-0 bg-[#3B82F6]/10 animate-pulse"></div>
                 <motion.div
                   initial={{ width: "0%" }}
                   animate={{ width: "90%" }}
                   transition={{ duration: 25, ease: "circOut" }}
-                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full relative"
+                  className="h-full bg-gradient-to-r from-[#1E3A8A] via-[#3B82F6] to-[#06B6D4] rounded-full relative"
                 >
                   <div className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-r from-transparent to-white/40 animate-[shimmer_2s_infinite]"></div>
                 </motion.div>
@@ -343,7 +347,7 @@ function App() {
           )}
         </AnimatePresence>
       </main>
-    </div >
+    </div>
   );
 }
 
@@ -363,19 +367,22 @@ const FileUploadSelector: React.FC<FileUploadSelectorProps> = ({
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -4, boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)" }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
       className="relative"
     >
-      <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-2xl blur-xl" />
-      <div className="relative bg-white/80 backdrop-blur-xl p-5 rounded-2xl shadow-xl shadow-slate-200/50 border border-white/60">
-        <label className="flex items-center gap-2 text-sm font-bold text-slate-800 mb-3 tracking-wide uppercase">
-          <ListChecks className="w-5 h-5 text-indigo-600" />
+      {/* Subtle gradient background using brand colors */}
+      <div className="absolute inset-0 bg-gradient-to-r from-[#1E40AF]/5 to-[#06B6D4]/5 rounded-2xl blur-xl" />
+      <div className="relative bg-white/80 backdrop-blur-xl p-5 rounded-2xl shadow-md hover:shadow-lg transition-shadow duration-200 border border-slate-200/60">
+        <label className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-3 tracking-wide normal-case">
+          <ListChecks className="w-5 h-5 text-[#1E40AF]" />
           Target Framework / Checklist
         </label>
         <div className="relative">
           <select
             value={selectedCategory}
             onChange={(e) => onCategoryChange(e.target.value)}
-            className="w-full px-5 py-3.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-inner text-slate-700 font-medium appearance-none cursor-pointer"
+            className="w-full px-5 py-3.5 bg-slate-50/50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] outline-none transition-all shadow-inner text-slate-700 font-medium appearance-none cursor-pointer hover:border-[#3B82F6]/50"
           >
             <option value="" disabled>Select the audit document</option>
             {categories.map((cat, idx) => (
@@ -454,20 +461,19 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
   };
 
   return (
-    <div className="w-full min-w-[420px] h-[580px] bg-white rounded-3xl shadow-xl border border-slate-100 p-8 flex flex-col relative overflow-hidden group">
-      {/* Spacer to align with CodeUploadDropzone tabs */}
-      <div className="h-[44px] mb-4 flex-shrink-0" />
-
+    <div className="w-full min-w-[420px] h-[520px] bg-white rounded-2xl shadow-md border border-slate-100 p-8 flex flex-col relative overflow-hidden group">
+      {/* Dashed upload zone fills entire card */}
       <motion.div
-        className={`flex-1 flex flex-col items-center justify-center relative overflow-hidden border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 ${isDragging
-          ? 'border-indigo-500 bg-indigo-50/80 shadow-[inset_0_0_50px_rgba(99,102,241,0.1)] scale-[1.02]'
-          : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-50 hover:shadow-xl hover:shadow-indigo-500/10'
-          }`}
+        className={`flex flex-col items-center justify-center relative overflow-hidden border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 h-full ${
+          isDragging
+            ? 'border-[#3B82F6] bg-gradient-to-br from-[#1E40AF]/5 via-[#3B82F6]/5 to-[#06B6D4]/5 shadow-2xl shadow-[#1E40AF]/20 scale-[1.02]'
+            : 'border-[#CBD5E1] hover:border-[#3B82F6] hover:bg-gradient-to-br hover:from-[#1E40AF]/5 hover:via-[#3B82F6]/5 hover:to-[#06B6D4]/5 hover:shadow-lg hover:shadow-[#3B82F6]/10'
+        }`}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         onClick={() => fileInputRef.current?.click()}
-        whileHover={{ y: -2 }}
+        whileHover={{ y: -3 }}
         whileTap={{ scale: 0.98 }}
       >
         <input
@@ -480,32 +486,51 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
 
         {uploading ? (
           <div className="flex flex-col items-center animate-pulse relative z-10">
-            <FileText className="w-16 h-16 text-indigo-500 mb-4 drop-shadow-lg" />
+            <FileText className="w-16 h-16 text-[#1E40AF] mb-4 drop-shadow-lg" />
             <p className="text-slate-600 font-semibold tracking-wide">Processing Document...</p>
           </div>
         ) : (
-          <div className="flex flex-col items-center relative z-10">
-            <div className="p-4 bg-white rounded-full shadow-sm mb-6 border border-slate-100 group-hover:scale-110 transition-transform">
-              <Upload className="w-10 h-10 text-indigo-500" />
-            </div>
-            <p className="text-xl font-bold text-slate-700 mb-2 tracking-tight">
+          <div className="flex flex-col items-center justify-center relative z-10 h-full">
+            {/* Icon container with brand gradient and enhanced shadow */}
+            <motion.div
+              className="p-4 bg-gradient-to-br from-[#1E3A8A] via-[#3B82F6] to-[#06B6D4] rounded-full shadow-lg shadow-[#3B82F6]/30 mb-5 group-hover:shadow-xl group-hover:shadow-[#3B82F6]/40"
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              whileHover={{ scale: 1.1, boxShadow: "0 25px 50px -12px rgb(59 130 246 / 0.5)" }}
+            >
+              <Upload className="w-14 h-14 text-white drop-shadow-md" />
+            </motion.div>
+
+            {/* Bold "Drag & drop" text */}
+            <p className="text-lg font-bold text-slate-700 mb-2 tracking-tight">
               Drag & drop your document here
             </p>
-            <p className="text-slate-500 mb-6">
-              or <span className="text-indigo-600 hover:text-indigo-700 underline underline-offset-4 cursor-pointer">browse from your computer</span>
+
+            {/* "or browse" with brand color link */}
+            <p className="text-slate-500 mb-4">
+              or{' '}
+              <span className="inline-flex items-center gap-1.5 text-[#3B82F6] font-semibold hover:text-[#1E40AF] transition-colors duration-200 cursor-pointer relative group/link">
+                <span className="relative">
+                  browse from your computer
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-[#1E3A8A] via-[#3B82F6] to-[#06B6D4] rounded-full opacity-70 group-hover/link:opacity-100 transition-opacity duration-200" />
+                </span>
+              </span>
             </p>
-            <p className="text-slate-500 text-sm mt-3 font-medium">
+
+            {/* File formats - text-sm to match note below */}
+            <p className="text-slate-500 text-xs mt-2 font-medium text-center max-w-xs">
               Supports PDFs, Word Docs (.docx), Excel (.xlsx, .csv), and PowerPoint (.pptx)
             </p>
-            <p className="text-slate-400 text-xs mt-1">
+
+            {/* Note - text-xs to be slightly smaller */}
+            <p className="text-slate-400 text-[11px] mt-1">
               Embedded flowcharts and screenshots are automatically graded via AI Vision.
             </p>
           </div>
         )}
       </motion.div>
 
-      {/* Spacer to align with CodeUploadDropzone button */}
-      <div className="mt-6 h-[54px] flex-shrink-0" />
+      {/* No bottom spacer needed */}
 
       <AnimatePresence>
         {error && (
@@ -637,7 +662,7 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
   };
 
   return (
-    <div className="w-full min-w-[420px] h-[580px] bg-white rounded-3xl shadow-xl border border-slate-100 p-8 flex flex-col relative overflow-hidden group">
+    <div className="w-full min-w-[420px] h-[520px] bg-white rounded-2xl shadow-md border border-slate-100 p-8 flex flex-col relative overflow-hidden group">
       <AnimatePresence>
         {error && (
           <motion.div
@@ -660,20 +685,25 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
         )}
       </AnimatePresence>
 
-      <div className="flex bg-slate-100 p-1 rounded-xl mb-4 relative flex-shrink-0 z-10 h-[44px]">
+      {/* Tab switcher with brand colors - reduced bottom margin for tighter layout */}
+      <div className="flex bg-slate-100 p-1 rounded-xl mb-3 relative flex-shrink-0 z-10 h-[44px]">
         <div
           className="absolute inset-y-1 w-1/2 bg-white rounded-lg shadow-sm transition-transform duration-300 ease-in-out"
           style={{ transform: `translateX(${activeTab === 'paste' ? 'calc(100% - 4px)' : '4px'})` }}
         />
         <button
           onClick={() => setActiveTab('files')}
-          className={`flex-1 py-2 text-sm font-bold relative z-10 transition-colors ${activeTab === 'files' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`flex-1 py-2 text-sm font-bold relative z-10 transition-colors ${
+            activeTab === 'files' ? 'text-[#1E40AF]' : 'text-slate-500 hover:text-slate-700'
+          }`}
         >
           Upload Files
         </button>
         <button
           onClick={() => setActiveTab('paste')}
-          className={`flex-1 py-2 text-sm font-bold relative z-10 transition-colors ${activeTab === 'paste' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`flex-1 py-2 text-sm font-bold relative z-10 transition-colors ${
+            activeTab === 'paste' ? 'text-[#1E40AF]' : 'text-slate-500 hover:text-slate-700'
+          }`}
         >
           Paste Code
         </button>
@@ -693,8 +723,8 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
               <div
                 className={`flex-1 flex flex-col items-center justify-center relative border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-300 ease-out cursor-pointer
                 ${isDragging
-                    ? 'border-indigo-400 bg-indigo-50/50 scale-[1.02] shadow-inner'
-                    : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50/50'}`}
+                    ? 'border-[#3B82F6] bg-[#3B82F6]/5 scale-[1.02] shadow-inner'
+                    : 'border-slate-200 hover:border-[#3B82F6] hover:bg-slate-50/50'}`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -710,8 +740,9 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/20 pointer-events-none rounded-2xl" />
 
                 <div className="relative z-10">
+                  {/* Icon container with brand colors */}
                   <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 transition-all duration-300
-                  ${isDragging ? 'bg-indigo-100 text-indigo-600 scale-110' : 'bg-slate-100 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500'}`}>
+                  ${isDragging ? 'bg-[#3B82F6]/10 text-[#1E40AF] scale-110' : 'bg-slate-100 text-slate-400 group-hover:bg-[#1E40AF]/5 group-hover:text-[#1E40AF]'}`}>
                     <FileCode2 className={`w-10 h-10 ${isDragging ? 'animate-bounce' : ''}`} />
                   </div>
 
@@ -722,13 +753,25 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
                     or click to browse from your computer
                   </p>
 
-                  <div className="flex gap-2 justify-center flex-wrap max-w-sm mx-auto opacity-0 sm:opacity-100">
-                    {['.py', '.js', '.ts', '.java', '.cpp', '.cs', '.go', '.html', '.css', '...'].map((ext) => (
-                      <span key={ext} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-semibold tracking-wide border border-slate-200/60 shadow-sm">
+                  {/* File type badges with brand colors */}
+                  <motion.div
+                    className="flex gap-2 justify-center flex-wrap max-w-sm mx-auto opacity-0 sm:opacity-100"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    {['.py', '.js', '.ts', '.java', '.cpp', '.cs', '.go', '.html', '.css', '...'].map((ext, index) => (
+                      <motion.span
+                        key={ext}
+                        className="px-2 py-1 bg-[#F1F5F9] text-[#475569] rounded text-xs font-semibold tracking-wide border border-[#E2E8F0] shadow-sm"
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05, duration: 0.2 }}
+                      >
                         {ext}
-                      </span>
+                      </motion.span>
                     ))}
-                  </div>
+                  </motion.div>
                 </div>
               </div>
 
@@ -739,7 +782,7 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
                     {selectedFiles.map((f, i) => (
                       <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 group/item">
                         <div className="flex items-center gap-3 overflow-hidden">
-                          <Code2 className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+                          <Code2 className="w-5 h-5 text-[#3B82F6] flex-shrink-0" />
                           <span className="text-sm font-medium text-slate-700 truncate">{f.file.name}</span>
                           <span className="text-xs text-slate-400">({(f.file.size / 1024).toFixed(1)} KB)</span>
                         </div>
@@ -768,7 +811,7 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
                 value={pastedCode}
                 onChange={(e) => setPastedCode(e.target.value)}
                 placeholder="Paste your source code here for analysis..."
-                className="flex-1 w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-6 font-mono text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400/50 resize-none custom-scrollbar shadow-inner"
+                className="flex-1 w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-6 font-mono text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-[#3B82F6]/10 focus:border-[#3B82F6] resize-none custom-scrollbar shadow-inner"
                 spellCheck={false}
               />
             </motion.div>
@@ -776,11 +819,12 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
         </AnimatePresence>
       </div>
 
-      <div className="mt-6 flex justify-end relative z-10 flex-shrink-0 h-[54px]">
+      {/* Submit button with brand colors - reduced margin for tighter layout */}
+      <div className="mt-4 flex justify-end relative z-10 flex-shrink-0 h-[48px]">
         <button
           onClick={handleSubmit}
           disabled={activeTab === 'files' ? selectedFiles.length === 0 : pastedCode.trim().length === 0}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-8 py-3.5 rounded-xl font-bold hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600 disabled:hover:shadow-none disabled:hover:translate-y-0"
+          className="flex items-center gap-2 bg-gradient-to-r from-[#1E3A8A] via-[#3B82F6] to-[#06B6D4] text-white px-8 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-[#3B82F6]/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:hover:translate-y-0"
         >
           <UploadCloud className="w-5 h-5" />
           Analyze Code
