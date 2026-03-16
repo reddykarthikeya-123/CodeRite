@@ -105,7 +105,7 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                 files: [{
                     filename: rawFile.filename,
                     content: rawFile.content,
-                    suggestions: suggestionsToApply
+                    selected_suggestions: suggestionsToApply
                 }]
             });
         }
@@ -129,7 +129,7 @@ export const CodeResult: React.FC<CodeResultProps> = ({ result, rawFiles, onRese
                     // Use the suggestions we applied
                     const fileReq = batchRequests.find(r => r.files.some(f => f.filename === ff.filename));
                     if (fileReq && fileReq.files.length > 0) {
-                        newAppliedSuggestions[fileIdx] = fileReq.files[0].suggestions;
+                        newAppliedSuggestions[fileIdx] = fileReq.files[0].selected_suggestions;
                     }
 
                     const parts = ff.filename.split('.');

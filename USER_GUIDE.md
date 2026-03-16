@@ -15,8 +15,8 @@ Built with a fast Python/FastAPI backend and a sleek React/TypeScript frontend, 
 Before doing any analysis, you must connect the app to an "AI Brain".
 1. Click the **Settings** gear icon (⚙️) in the top-right corner.
 2. In the "**AI Connections**" section, click "**+ Add Connection**" or edit an existing one.
-3. Choose your preferred Provider (e.g., OpenAI, Google Gemini, Anthropic, or Local Ollama).
-4. Enter the required API Key and the specific Model Name (e.g., `gemini-2.5-flash` or `gpt-4o`).
+3. Choose your preferred Provider (e.g., OpenAI, Google Gemini, or Local Ollama).
+4. Enter the required API Key and the specific Model Name (e.g., `gemini-1.5-flash` or `gpt-4o`).
 5. **CRITICAL**: Ensure at least one connection is toggled as **Active**. The app will always use the currently active connection for all analysis!
 
 ### 2. Document Review Flow

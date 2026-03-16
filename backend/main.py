@@ -15,6 +15,7 @@ from pydantic import BaseModel
 import json
 import shutil
 import logging
+import platform
 from config.logging_config import setup_logging
 
 setup_logging()
@@ -48,8 +49,6 @@ async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    import os
-    import platform
     # Auto-inject paths for Windows local execution without terminal restart
     if platform.system() == "Windows":
         win_path = os.environ.get("PATH", "")

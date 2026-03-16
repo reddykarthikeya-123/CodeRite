@@ -54,7 +54,7 @@ export interface AnalyzeCodeRequest {
 export interface AutoFixRequest {
     filename: string;
     content: string;
-    suggestions: string[];
+    selected_suggestions: string[];
 }
 
 export interface AutoFixResponse {
@@ -65,7 +65,7 @@ export interface BatchAutoFixRequest {
     files: {
         filename: string;
         content: string;
-        suggestions: string[];
+        selected_suggestions: string[];
     }[];
 }
 

@@ -140,9 +140,9 @@ export const analyzeCode = async (files: { filename: string, content: string }[]
   return response.json();
 };
 
-export const autoFixCode = async (filename: string, content: string, suggestions: string[]): Promise<AutoFixResponse> => {
-    const payload: AutoFixRequest = { filename, content, suggestions };
-    const response = await fetch(`${API_BASE_URL}/auto-fix`, {
+export const autoFixCode = async (filename: string, content: string, selected_suggestions: string[]): Promise<AutoFixResponse> => {
+    const payload: AutoFixRequest = { filename, content, selected_suggestions };
+    const response = await fetch(`${API_BASE_URL}/auto-fix-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -154,7 +154,7 @@ export const autoFixCode = async (filename: string, content: string, suggestions
 export const autoFixCodeBatch = async (
     requests: BatchAutoFixRequest[]
 ): Promise<BatchAutoFixResponse> => {
-    const response = await fetch(`${API_BASE_URL}/auto-fix-batch`, {
+    const response = await fetch(`${API_BASE_URL}/auto-fix-code-batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files: requests.flatMap(r => r.files) }),

@@ -23,3 +23,5 @@ langchain-google-genai
 httpcore
 alembic
 python-magic
+gunicorn
+uvicorn[standard]
