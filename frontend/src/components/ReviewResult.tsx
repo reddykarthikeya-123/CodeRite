@@ -41,9 +41,10 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
         setSelectedFilters(prev => {
             const next = new Set(prev);
             if (next.has(status)) {
-                // Don't allow deselecting the last remaining filter
-                if (next.size > 1) {
-                    next.delete(status);
+                next.delete(status);
+                // Prevent empty filter state - revert if no filters left
+                if (next.size === 0) {
+                    return prev; // Keep previous state unchanged
                 }
                 return next;
             } else {
