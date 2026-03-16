@@ -840,13 +840,13 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.2 }}
-              className="flex-1 flex flex-col overflow-hidden w-full h-full"
+              className="h-full flex flex-col w-full overflow-hidden"
             >
               <div
-                className={`flex-1 flex flex-col items-center justify-center relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 ease-out cursor-pointer
+                className={`h-full flex flex-col items-center relative border-2 border-dashed rounded-2xl p-0 text-center transition-all duration-300 ease-out cursor-pointer overflow-hidden
                 ${isDragging
-                    ? 'border-[#3B82F6] bg-gradient-to-br from-[#1E40AF]/5 via-[#3B82F6]/5 to-[#06B6D4]/5 scale-[1.02] shadow-lg shadow-[#3B82F6]/20'
-                    : 'border-slate-200 hover:border-[#3B82F6] hover:bg-slate-50/70 hover:shadow-md'}`}
+                    ? 'border-[#3B82F6] bg-gradient-to-br from-[#1E40AF]/5 via-[#3B82F6]/5 to-[#06B6D4]/5 scale-[1.01] shadow-lg shadow-[#3B82F6]/20'
+                    : 'border-slate-200 hover:border-[#3B82F6] hover:bg-slate-50/70'}`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -863,74 +863,83 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
                   onChange={handleFileInput}
                 />
 
-                <div className="relative z-10">
-                  {/* Icon container with brand colors and animation */}
+                <div className={`flex-1 flex flex-col items-center justify-center relative z-10 w-full p-6 ${selectedFiles.length > 0 ? 'pb-2' : ''}`}>
+                  {/* Icon container with brand colors and animation - scaled down if files exist */}
                   <motion.div
-                    className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-5 transition-all duration-300
-                  ${isDragging ? 'bg-[#3B82F6]/10 text-[#1E40AF] scale-110' : 'bg-slate-100 text-slate-400 group-hover:bg-gradient-to-br group-hover:from-[#1E40AF]/5 group-hover:to-[#06B6D4]/5 group-hover:text-[#1E40AF]'}`}
+                    className={`mx-auto rounded-full flex items-center justify-center transition-all duration-300
+                  ${selectedFiles.length > 0 ? 'w-12 h-12 mb-3' : 'w-20 h-20 mb-5'}
+                  ${isDragging ? 'bg-[#3B82F6]/10 text-[#1E40AF] scale-110' : 'bg-slate-100 text-slate-400 group-hover:bg-[#1E40AF]/5 group-hover:text-[#1E40AF]'}`}
                     animate={!isDragging ? { scale: [1, 1.05, 1] } : {}}
                     transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                   >
-                    <FileCode2 className={`w-10 h-10 ${isDragging ? 'animate-bounce' : ''}`} />
+                    <FileCode2 className={`${selectedFiles.length > 0 ? 'w-6 h-6' : 'w-10 h-10'} ${isDragging ? 'animate-bounce' : ''}`} />
                   </motion.div>
 
-                  <h3 className="text-xl font-bold text-slate-800 tracking-tight mb-2">
-                    Drop code files here
+                  <h3 className={`${selectedFiles.length > 0 ? 'text-base' : 'text-xl'} font-bold text-slate-800 tracking-tight mb-1`}>
+                    {selectedFiles.length > 0 ? 'Add more files' : 'Drop code files here'}
                   </h3>
-                  <p className="text-slate-500 mb-5 font-medium">
-                    or click to browse from your computer
-                  </p>
+                  {!selectedFiles.length && (
+                    <p className="text-slate-500 mb-5 font-medium">
+                      or click to browse from your computer
+                    </p>
+                  )}
 
-                  {/* File type badges with brand colors */}
-                  <motion.div
-                    className="flex gap-2 justify-center flex-wrap max-w-sm mx-auto mb-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    {['.py', '.js', '.ts', '.java', '.cpp', '.cs', '.go', '.html', '.css'].map((ext, index) => (
-                      <motion.span
-                        key={ext}
-                        className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] rounded-lg text-xs font-semibold tracking-wide border border-[#E2E8F0] shadow-sm hover:bg-[#1E40AF]/5 hover:text-[#1E40AF] hover:border-[#1E40AF]/30 transition-colors"
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.04, duration: 0.2 }}
-                      >
-                        {ext}
-                      </motion.span>
-                    ))}
-                  </motion.div>
-                  
-                  {/* File size hint */}
-                  <p className="text-slate-400 text-xs font-medium flex items-center gap-1.5 justify-center">
-                    <FileUp className="w-3.5 h-3.5" />
-                    Max 5MB per file
-                  </p>
-                </div>
-              </div>
-
-              {selectedFiles.length > 0 && (
-                <div className="mt-3 flex-shrink-0">
-                  <h4 className="text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">Selected Files</h4>
-                  <div className="space-y-1.5 max-h-20 overflow-y-auto pr-2 custom-scrollbar">
-                    {selectedFiles.map((f, i) => (
-                      <div key={i} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200 group/item">
-                        <div className="flex items-center gap-2.5 overflow-hidden">
-                          <Code2 className="w-4 h-4 text-[#3B82F6] flex-shrink-0" />
-                          <span className="text-sm font-medium text-slate-700 truncate">{f.file.name}</span>
-                          <span className="text-xs text-slate-400">({(f.file.size / 1024).toFixed(1)} KB)</span>
-                        </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); removeFile(i); }}
-                          className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover/item:opacity-100"
+                  {/* File type badges - hidden if files exist to save space */}
+                  {!selectedFiles.length && (
+                    <motion.div
+                      className="flex gap-2 justify-center flex-wrap max-w-sm mx-auto mb-4"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      {['.py', '.js', '.ts', '.java', '.cpp', '.cs', '.go', '.html', '.css'].map((ext, index) => (
+                        <motion.span
+                          key={ext}
+                          className="px-3 py-1.5 bg-[#F1F5F9] text-[#475569] rounded-lg text-xs font-semibold tracking-wide border border-[#E2E8F0] shadow-sm transition-colors"
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.04, duration: 0.2 }}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                          {ext}
+                        </motion.span>
+                      ))}
+                    </motion.div>
+                  )}
+                  
+                  {!selectedFiles.length && (
+                    <p className="text-slate-400 text-xs font-medium flex items-center gap-1.5 justify-center">
+                      <FileUp className="w-3.5 h-3.5" />
+                      Max 5MB per file
+                    </p>
+                  )}
                 </div>
-              )}
+
+                {/* Selected Files List - Inside the dashed box at the bottom */}
+                {selectedFiles.length > 0 && (
+                  <div className="w-full mt-auto bg-white/50 backdrop-blur-sm border-t border-slate-100 p-4 relative z-20">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Selected Files ({selectedFiles.length})</h4>
+                    </div>
+                    <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+                      {selectedFiles.map((f, i) => (
+                        <div key={i} className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 group/item hover:border-[#3B82F6]/30 transition-colors">
+                          <div className="flex items-center gap-2.5 overflow-hidden">
+                            <Code2 className="w-3.5 h-3.5 text-[#3B82F6] flex-shrink-0" />
+                            <span className="text-xs font-bold text-slate-700 truncate">{f.file.name}</span>
+                            <span className="text-[10px] text-slate-400 font-medium">({(f.file.size / 1024).toFixed(1)} KB)</span>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); removeFile(i); }}
+                            className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </motion.div>
           ) : (
             <motion.div
@@ -939,15 +948,17 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
-              className="flex-1 flex flex-col w-full h-full"
+              className="h-full flex flex-col w-full"
             >
-              <textarea
-                value={pastedCode}
-                onChange={(e) => setPastedCode(e.target.value)}
-                placeholder="Paste your source code here for analysis..."
-                className="flex-1 w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-5 font-mono text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-[#3B82F6]/10 focus:border-[#3B82F6] resize-none custom-scrollbar shadow-inner"
-                spellCheck={false}
-              />
+              <div className="h-full flex flex-col relative border-2 border-dashed rounded-2xl transition-all duration-300 border-slate-200 bg-slate-50/50 overflow-hidden">
+                <textarea
+                  value={pastedCode}
+                  onChange={(e) => setPastedCode(e.target.value)}
+                  placeholder="Paste your source code here for analysis..."
+                  className="w-full h-full bg-transparent border-0 p-6 font-mono text-sm text-slate-700 focus:outline-none focus:ring-0 resize-none custom-scrollbar"
+                  spellCheck={false}
+                />
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
