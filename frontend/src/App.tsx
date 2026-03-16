@@ -115,7 +115,9 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9] text-slate-900 font-sans selection:bg-[#1E40AF]/10 selection:text-[#1E40AF] overflow-hidden">
+    <div className={`flex flex-col h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9] text-slate-900 font-sans selection:bg-[#1E40AF]/10 selection:text-[#1E40AF] ${
+      !currentFile && !uploading && !docReviewResult && !codeReviewResult ? 'home-page-no-scroll' : ''
+    }`}>
       {/* Settings Modal */}
       <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="System Preferences">
         <ConfigurationPanel />
@@ -146,7 +148,9 @@ function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12 flex-1 flex flex-col justify-center">
+      <main className={`max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12 flex-1 flex flex-col ${
+        !currentFile && !uploading && !docReviewResult && !codeReviewResult ? 'justify-center' : 'justify-start overflow-y-auto'
+      }`}>
         <AnimatePresence mode="wait">
           {!currentFile && !uploading && !docReviewResult && !codeReviewResult && (
             // Upload view container with entrance animation
@@ -479,6 +483,8 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const isDisabled = !selectedCategory;
+
   const handleFile = async (file: File) => {
     if (!selectedCategory) {
       onErrorChange("Please select an audit document category before uploading.");
@@ -503,7 +509,7 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(true);
+    if (!isDisabled) setIsDragging(true);
   };
 
   const onDragLeave = () => {
@@ -513,6 +519,7 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    if (isDisabled) return;
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFile(e.dataTransfer.files[0]);
     }
@@ -522,20 +529,23 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
     <div className="w-full min-w-[420px] h-[580px] bg-white rounded-2xl shadow-lg border border-slate-100 p-6 flex flex-col relative overflow-hidden group">
       {/* Dashed upload zone fills entire card */}
       <motion.div
-        className={`flex flex-col items-center justify-center relative overflow-hidden border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 h-full ${
+        className={`flex flex-col items-center justify-center relative overflow-hidden border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 h-full ${
           isDragging
             ? 'border-[#3B82F6] bg-gradient-to-br from-[#1E40AF]/5 via-[#3B82F6]/5 to-[#06B6D4]/5 shadow-2xl shadow-[#1E40AF]/20 scale-[1.02]'
-            : 'border-slate-200 hover:border-[#3B82F6] hover:bg-gradient-to-br hover:from-[#1E40AF]/5 hover:via-[#3B82F6]/5 hover:to-[#06B6D4]/5 hover:shadow-lg hover:shadow-[#3B82F6]/10'
+            : isDisabled
+              ? 'border-slate-200 bg-slate-50/50 cursor-not-allowed opacity-60'
+              : 'border-slate-200 hover:border-[#3B82F6] hover:bg-gradient-to-br hover:from-[#1E40AF]/5 hover:via-[#3B82F6]/5 hover:to-[#06B6D4]/5 hover:shadow-lg hover:shadow-[#3B82F6]/10'
         }`}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
-        onClick={() => fileInputRef.current?.click()}
-        whileHover={{ y: -3 }}
-        whileTap={{ scale: 0.98 }}
+        onClick={() => !isDisabled && fileInputRef.current?.click()}
+        whileHover={!isDisabled ? { y: -3 } : {}}
+        whileTap={!isDisabled ? { scale: 0.98 } : {}}
         role="button"
-        tabIndex={0}
-        aria-label="Upload document area. Drag and drop or click to browse files."
+        tabIndex={isDisabled ? -1 : 0}
+        aria-label={isDisabled ? "Please select a compliance framework first" : "Upload document area. Drag and drop or click to browse files."}
+        aria-disabled={isDisabled}
       >
         <input
           type="file"
@@ -554,26 +564,36 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
           <div className="flex flex-col items-center justify-center relative z-10">
             {/* Icon container with brand gradient and enhanced shadow */}
             <motion.div
-              className="p-4 bg-gradient-to-br from-[#1E3A8A] via-[#3B82F6] to-[#06B6D4] rounded-full shadow-lg shadow-[#3B82F6]/30 mb-5 group-hover:shadow-xl group-hover:shadow-[#3B82F6]/40"
-              animate={{ scale: [1, 1.05, 1] }}
+              className={`p-4 rounded-full shadow-lg mb-5 transition-all duration-300 ${
+                isDisabled
+                  ? 'bg-slate-200 shadow-none'
+                  : 'bg-gradient-to-br from-[#1E3A8A] via-[#3B82F6] to-[#06B6D4] shadow-lg shadow-[#3B82F6]/30 group-hover:shadow-xl group-hover:shadow-[#3B82F6]/40'
+              }`}
+              animate={!isDisabled && !uploading ? { scale: [1, 1.05, 1] } : {}}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              whileHover={{ scale: 1.1, boxShadow: "0 25px 50px -12px rgb(59 130 246 / 0.5)" }}
+              whileHover={!isDisabled ? { scale: 1.1, boxShadow: "0 25px 50px -12px rgb(59 130 246 / 0.5)" } : {}}
             >
-              <Upload className="w-14 h-14 text-white drop-shadow-md" />
+              <Upload className={`w-14 h-14 ${isDisabled ? 'text-slate-400' : 'text-white drop-shadow-md'}`} />
             </motion.div>
 
             {/* Bold "Drag & drop" text */}
-            <p className="text-lg font-bold text-slate-700 mb-2 tracking-tight">
+            <p className={`text-lg font-bold mb-2 tracking-tight ${isDisabled ? 'text-slate-400' : 'text-slate-700'}`}>
               Drag & drop your document here
             </p>
 
             {/* "or browse" with brand color link */}
-            <p className="text-slate-500 mb-4">
+            <p className={`text-slate-500 mb-4 ${isDisabled ? 'opacity-50' : ''}`}>
               or{' '}
-              <span className="inline-flex items-center gap-1.5 text-[#3B82F6] font-semibold hover:text-[#1E40AF] transition-colors duration-200 cursor-pointer relative group/link">
+              <span className={`inline-flex items-center gap-1.5 font-semibold transition-colors duration-200 relative group/link ${
+                isDisabled
+                  ? 'text-slate-400 cursor-not-allowed'
+                  : 'text-[#3B82F6] hover:text-[#1E40AF] cursor-pointer'
+              }`}>
                 <span className="relative">
                   browse from your computer
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-[#1E3A8A] via-[#3B82F6] to-[#06B6D4] rounded-full opacity-70 group-hover/link:opacity-100 transition-opacity duration-200" />
+                  {!isDisabled && (
+                    <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-[#1E3A8A] via-[#3B82F6] to-[#06B6D4] rounded-full opacity-70 group-hover/link:opacity-100 transition-opacity duration-200" />
+                  )}
                 </span>
               </span>
             </p>
@@ -588,18 +608,22 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
               ].map((format) => (
                 <motion.div
                   key={format.ext}
-                  className={`px-3 py-1.5 ${format.bg} rounded-lg border border-slate-200 shadow-sm`}
+                  className={`px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm transition-all duration-300 ${
+                    isDisabled
+                      ? 'bg-slate-100 opacity-50'
+                      : `${format.bg} ${format.color}`
+                  }`}
                   initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  animate={{ opacity: isDisabled ? 0.5 : 1, y: 0 }}
                   transition={{ delay: 0.2 }}
                 >
-                  <span className={`text-xs font-bold ${format.color}`}>{format.ext}</span>
+                  <span className={`text-xs font-bold ${isDisabled ? 'text-slate-400' : format.color}`}>{format.ext}</span>
                 </motion.div>
               ))}
             </div>
 
             {/* File size hint */}
-            <p className="text-slate-500 text-xs font-medium flex items-center gap-1.5 mb-1.5">
+            <p className={`text-xs font-medium flex items-center gap-1.5 mb-1.5 ${isDisabled ? 'text-slate-400' : 'text-slate-500'}`}>
               <FileUp className="w-3.5 h-3.5" />
               Max file size: 50MB
             </p>
@@ -608,6 +632,22 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
             <p className="text-slate-400 text-[11px]">
               Embedded flowcharts and screenshots are automatically graded via AI Vision.
             </p>
+
+            {/* Disabled overlay message */}
+            {isDisabled && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-2xl z-20"
+              >
+                <div className="bg-white px-6 py-3 rounded-xl shadow-lg border-2 border-slate-200 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <span className="text-sm font-semibold text-slate-600">Select a framework to enable upload</span>
+                </div>
+              </motion.div>
+            )}
           </div>
         )}
       </motion.div>
