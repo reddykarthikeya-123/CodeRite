@@ -288,11 +288,11 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                                                         <p className="text-[14px] text-slate-600 mt-1.5 leading-relaxed">
                                                             {/* Only show Page and Slide references for non-Fail items (exclude Section references) */}
                                                             {item.status !== 'Fail' ? (
-                                                                item.comment.split(/([Page \d+]|[Slide \d+])/g).map((part, index) => {
-                                                                    if (part.match(/[Page \d+]|[Slide \d+]/)) {
+                                                                item.comment.split(/(\[Page \d+\]|\[Slide \d+\])/g).map((part, index) => {
+                                                                    if (part.match(/\[Page \d+\]|\[Slide \d+\]/)) {
                                                                         return (
                                                                             <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 mr-1 shadow-sm">
-                                                                                {part.replace(/[[\]]/g, '')}
+                                                                                {part.replace(/[\[\]]/g, '')}
                                                                             </span>
                                                                         );
                                                                     }
@@ -300,7 +300,7 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                                                                 })
                                                             ) : (
                                                                 // For Fail items, remove all references and show only the comment text
-                                                                item.comment.replace(/[Page \d+]|[Slide \d+]|[Section \d+]/g, '').trim()
+                                                                item.comment.replace(/\[Page \d+\]|\[Slide \d+\]|\[Section \d+\]/g, '').trim()
                                                             )}
                                                         </p>
                                                     )}
