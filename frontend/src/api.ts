@@ -97,9 +97,10 @@ export const fetchChecklistCategories = async (): Promise<string[]> => {
   return data.categories || [];
 };
 
-export const analyzeDocument = async (text: string, customInstructions: string, documentCategory?: string, images?: string[]): Promise<ReviewResponse> => {
+export const analyzeDocument = async (text: string, customInstructions: string, documentCategory?: string, images?: string[], fileType?: string): Promise<ReviewResponse> => {
   const payload: any = { text, custom_instructions: customInstructions, images: images || [] };
   if (documentCategory) payload.document_category = documentCategory;
+  if (fileType) payload.file_type = fileType;
 
   const response = await fetch(`${API_BASE_URL}/analyze`, {
     method: "POST",

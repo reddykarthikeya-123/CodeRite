@@ -79,7 +79,7 @@ class AIEngine:
             print(f"Connection test failed: {e}")
             raise Exception(f"{str(e)}")
 
-    async def analyze_document(self, text: str, images: List[str] = None, custom_instructions: str = "", document_category: str = None) -> dict:
+    async def analyze_document(self, text: str, images: List[str] = None, custom_instructions: str = "", document_category: str = None, file_type: str = None) -> dict:
         from services.checklist_loader import loader
 
         target_checklist = []
@@ -88,16 +88,51 @@ class AIEngine:
             target_checklist = loader.get_checklist_for_category(document_category)
             checklist_context = "\nTarget Checklist exactly to follow:\n" + json.dumps(target_checklist, indent=2)
 
-        system_prompt = """You are an expert document auditor and reviewer. 
+        # Determine reference format based on file type
+        reference_format = "Section"  # Default
+        reference_enabled = True  # Whether to include location references at all
+
+        if file_type:
+            file_type = file_type.lower().strip('.')
+            
+            # Text/code files: disable location references entirely (no natural page divisions)
+            if file_type in ["txt", "md", "py", "js", "ts", "json", "html", "css"]:
+                reference_format = None
+                reference_enabled = False
+            elif file_type in ["pdf", "docx", "doc"]:
+                reference_format = "Page"
+            elif file_type in ["pptx", "ppt"]:
+                reference_format = "Slide"
+            elif file_type in ["xlsx", "xls", "csv"]:
+                reference_format = "Sheet"  # Will be formatted as "Sheet: SheetName" in output
+
+        # Build conditional reference instructions based on file type
+        if reference_enabled and reference_format:
+            if reference_format == "Sheet":
+                reference_instructions = f"""2. **Location References - Conditional Rules**:
+   - **PASS items (status="Pass")**: ALWAYS include the sheet reference with specific evidence. Use format "[Sheet: SheetName]" (e.g., "[Sheet: Data]", "[Sheet: Summary]"). Example: "[Sheet: Data] Found title 'Project X' authored by John Doe" - you must prove you read the specific detail.
+   - **WARNING items (status="Warning")**: Include the sheet reference ONLY if partial content was found. Example: "[Sheet: Summary] Input defined but output missing..." If nothing exists to reference, omit the location.
+   - **FAIL items (status="Fail")**: Do NOT include any sheet reference when nothing was found. Simply explain what is missing. Example: "No process flows found" - NO sheet prefix needed since there's nothing to reference."""
+            else:
+                reference_instructions = f"""2. **Location References - Conditional Rules**:
+   - **PASS items (status="Pass")**: ALWAYS include the {reference_format} reference with specific evidence extracted from the document. Example: "[{reference_format} 5] Found title 'Project X' authored by John Doe" - you must prove you read the specific detail.
+   - **WARNING items (status="Warning")**: Include the {reference_format} reference ONLY if partial content was found. Example: "[{reference_format} 13] Input defined but output missing..." If nothing exists to reference, omit the location.
+   - **FAIL items (status="Fail")**: Do NOT include any {reference_format} reference when nothing was found. Simply explain what is missing. Example: "No process flows found" - NO page prefix needed since there's nothing to reference."""
+        else:
+            reference_instructions = """2. **Location References**: Do NOT include page/sheet/slide references for this file type. Provide comments based on content evidence without location prefixes."""
+
+        system_prompt = f"""You are an expert document auditor and reviewer.
         Your task is to review the provided document against standard best practices, any custom instructions, and strictly against the Target Checklist provided.
         You must evaluate *every single item* in the target checklist.
-        
+
         CRITICAL INSTRUCTIONS FOR COMMENTS & SUGGESTIONS:
-        1. For EVERY item marked "Fail" or "Warning", provide a specific, actionable recommendation in the "suggestions" array on how to fix it, indicating its type ("Fail" or "Warning"). Do not group them.
-        2. For EVERY item in the checklist, the "comment" field MUST start with the exact page or slide reference where the information was found (e.g., "[Page 5]" or "[Slide 2]").
-        3. For EVERY item marked "Pass", the "comment" field MUST contain the page reference AND actual evidence extracted from the document proving the pass (e.g., "[Page 5] Found title 'Project X' authored by John Doe", NOT just "The document has a title"). You must prove you read the specific detail by providing the exact page reference.
-        4. If a checklist item contains multiple requirements (e.g. "Benefits AND expected outcomes"), and the document only fulfills one of them (e.g. only benefits are found), you MUST mark the status as "Warning", explaining exactly which part is missing in the comment, and providing the page reference for the partial find.
-        
+
+        1. **Suggestions Array**: For EVERY item marked "Fail" or "Warning", provide a specific, actionable recommendation in the "suggestions" array on how to fix it, indicating its type ("Fail" or "Warning"). Do not group them.
+
+        {reference_instructions}
+
+        3. **Multiple Requirements**: If a checklist item contains multiple requirements (e.g. "Benefits AND expected outcomes"), and the document only fulfills one of them (e.g. only benefits are found), you MUST mark the status as "Warning", explaining exactly which part is missing in the comment, and providing the location reference for the partial find (if applicable per rule 2).
+
         You must output a JSON object with the following structure:
         {{
             "checklist": [
@@ -108,11 +143,11 @@ class AIEngine:
             ],
             "rewritten_content": "<Optional: Rewritten sections or the entire document if requested>"
         }}
-        
+
         Ensure the tone is professional and constructive.
         {checklist_context}
         """
-        system_msg_content = system_prompt.format(checklist_context=checklist_context)
+        system_msg_content = system_prompt
         
         # Check if the selected model supports vision (heuristic)
         supports_vision = any(v in self.model_name.lower() for v in ["gpt-4o", "gemini-1.5", "llava", "vision"])

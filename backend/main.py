@@ -77,6 +77,7 @@ class AnalysisRequest(BaseModel):
     images: Optional[List[str]] = []
     custom_instructions: Optional[str] = ""
     document_category: str
+    file_type: Optional[str] = None
 
 class CodeFile(BaseModel):
     filename: str
@@ -210,7 +211,13 @@ async def analyze_document(request: AnalysisRequest, db: AsyncSession = Depends(
 
     try:
         engine = AIEngine(provider=provider, model_name=model_name, api_key=api_key)
-        review_result = await engine.analyze_document(request.text, request.images, request.custom_instructions, request.document_category)
+        review_result = await engine.analyze_document(
+            request.text, 
+            request.images, 
+            request.custom_instructions, 
+            request.document_category,
+            request.file_type
+        )
         
         # Save result to DB (Optional for prototype)
         # review = DocumentReview(score=review_result.get("score", 0), full_response_json=review_result)

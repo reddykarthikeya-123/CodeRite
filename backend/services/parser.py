@@ -95,13 +95,13 @@ async def _parse_pdf(file: UploadFile) -> tuple[str, list]:
 async def _parse_docx(file: UploadFile) -> tuple[str, list]:
     content = await file.read()
     doc = Document(io.BytesIO(content))
-    
+
     text = ""
     paragraphs = doc.paragraphs
-    # Group paragraphs into virtual sections for reference (approx 10 paras per section)
+    # Group paragraphs into virtual pages for reference (approx 10 paras per page)
     for i, para in enumerate(paragraphs):
         if i % 10 == 0:
-            text += f"\n--- Section {(i // 10) + 1} ---\n"
+            text += f"\n--- Page {(i // 10) + 1} ---\n"
         if para.text.strip():
             text += para.text + "\n"
     
