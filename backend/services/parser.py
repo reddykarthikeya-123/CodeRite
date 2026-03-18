@@ -183,9 +183,10 @@ async def _parse_docx_from_bytes(content: bytes) -> Tuple[str, List[str]]:
     """
     doc = Document(io.BytesIO(content))
     text = ""
-    for i, para in enumerate(doc.paragraphs):
-        if i % 10 == 0:
-            text += f"\n--- Page {(i // 10) + 1} ---\n"
+    # DOCX files don't have reliable page breaks in their structure
+    # (pagination is determined at render time by the viewer)
+    # So we extract text without artificial page markers
+    for para in doc.paragraphs:
         if para.text.strip():
             text += para.text + "\n"
 

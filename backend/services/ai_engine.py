@@ -135,17 +135,32 @@ class AIEngine:
 
         if file_type:
             file_type = file_type.lower().strip('.')
-            
-            # Text/code files: disable location references entirely (no natural page divisions)
-            if file_type in ["txt", "md", "py", "js", "ts", "json", "html", "css"]:
+
+            # Text/code files and DOCX: disable location references
+            # DOCX files don't have reliable page breaks (pagination is viewer-dependent)
+            if file_type in ["txt", "md", "py", "js", "ts", "json", "html", "css", "docx", "doc"]:
                 reference_format = None
                 reference_enabled = False
-            elif file_type in ["pdf", "docx", "doc"]:
-                reference_format = "Page"
-            elif file_type in ["pptx", "ppt"]:
-                reference_format = "Slide"
+            elif file_type in ["pdf", "pptx", "ppt"]:
+                reference_format = "Page" if file_type in ["pdf"] else "Slide"
             elif file_type in ["xlsx", "xls", "csv"]:
                 reference_format = "Sheet"  # Will be formatted as "Sheet: SheetName" in output
+
+        # Extract total page count from document text for validation
+        import re
+        total_pages = 0
+        if file_type and file_type.lower().strip('.') == "pdf":
+            # PDF files have page markers in the format "--- Page X Text ---" or "--- Page X Tables ---"
+            page_matches = re.findall(r'--- Page (\d+) (?:Text|Tables) ---', text)
+            if page_matches:
+                total_pages = max([int(p) for p in page_matches], default=0)
+        elif file_type and file_type.lower().strip('.') in ["pptx", "ppt"]:
+            slide_matches = re.findall(r'--- Slide (\d+) ---', text)
+            if slide_matches:
+                total_pages = max([int(s) for s in slide_matches], default=0)
+        elif file_type and file_type.lower().strip('.') in ["xlsx", "xls", "csv"]:
+            sheet_matches = re.findall(r'--- Excel Sheet: (.+?) ---', text)
+            total_pages = len(sheet_matches)  # Count of sheets
 
         # Build conditional reference instructions based on file type
         if reference_enabled and reference_format:
@@ -156,6 +171,11 @@ class AIEngine:
    - **FAIL items (status="Fail")**: Do NOT include any sheet reference when nothing was found. Simply explain what is missing. Example: "No process flows found" - NO sheet prefix needed since there's nothing to reference."""
             else:
                 reference_instructions = f"""2. **Location References - Conditional Rules**:
+   - **How to Find Page/Slide Numbers**: The document text contains page markers in the format "--- Page X Text ---", "--- Page X Tables ---", or "--- Slide X ---". To find the correct page number for any content:
+     1. Search for the content in the document text
+     2. Look backwards from that content to find the nearest "--- Page X Text ---", "--- Page X Tables ---", or "--- Slide X ---" marker
+     3. Use that X value as the page/slide number in your response (e.g., [Page X] or [Slide X])
+     4. **IMPORTANT**: This document has exactly **{total_pages} {reference_format}s** (numbered 1 to {total_pages}). All your page references MUST be between 1 and {total_pages}. If you can't find content within these pages, mark it as "Fail" without a page reference.
    - **PASS items (status="Pass")**: ALWAYS include the {reference_format} reference with specific evidence extracted from the document. Example: "[{reference_format} 5] Found title 'Project X' authored by John Doe" - you must prove you read the specific detail.
    - **WARNING items (status="Warning")**: Include the {reference_format} reference ONLY if partial content was found. Example: "[{reference_format} 13] Input defined but output missing..." If nothing exists to reference, omit the location.
    - **FAIL items (status="Fail")**: Do NOT include any {reference_format} reference when nothing was found. Simply explain what is missing. Example: "No process flows found" - NO page prefix needed since there's nothing to reference."""
@@ -213,24 +233,26 @@ class AIEngine:
         
         try:
             response = await chain.ainvoke(messages)
-            
-            # Programmatic Scoring Logic
+
+            # Validate and correct page numbers in AI response
+            response = self._validate_page_numbers(response, total_pages, reference_format)
+
             # Programmatic Scoring Logic
             valid_items = 0
             score = 0
-            
+
             for item in response.get("checklist", []):
                 status = str(item.get("status", "")).lower()
                 if "not applicable" in status or "n/a" in status:
                     continue # Skip these entirely from the calculation
-                    
+
                 valid_items += 1
                 if "pass" in status:
                     score += 1.0
                 elif "warning" in status:
                     score += 0.5
                 # fail gets 0
-            
+
             if valid_items == 0:
                 response["score"] = 0
             else:
@@ -246,6 +268,42 @@ class AIEngine:
                 "suggestions": [{"type": "Fail", "text": "Check configuration and try again."}],
                 "rewritten_content": ""
             }
+
+    def _validate_page_numbers(self, response: dict, total_pages: int, reference_format: str) -> dict:
+        """Validate and correct page numbers in AI response.
+        
+        Args:
+            response: The AI response dictionary
+            total_pages: Total number of pages in the document
+            reference_format: The reference format (Page, Slide, etc.)
+            
+        Returns:
+            The response with corrected page references
+        """
+        if not total_pages or not reference_format or reference_format == "Sheet":
+            return response
+            
+        import re
+        
+        for item in response.get("checklist", []):
+            comment = item.get("comment", "")
+            if not comment:
+                continue
+                
+            # Find all [Page X] or [Slide X] references
+            pattern = rf'\[{reference_format} (\d+)\]'
+            matches = re.findall(pattern, comment)
+            
+            for match in matches:
+                page_num = int(match)
+                if page_num > total_pages or page_num < 1:
+                    # Remove invalid reference
+                    comment = comment.replace(f'[{reference_format} {page_num}]', f'[{reference_format} reference removed - invalid]')
+                    logger.warning(f"Corrected invalid {reference_format.lower()} reference: {page_num} (document has {total_pages} {reference_format}s)")
+            
+            item["comment"] = comment
+            
+        return response
 
     async def analyze_code(self, files: List[dict]) -> dict:
         """Performs a comprehensive code review on a list of files.
