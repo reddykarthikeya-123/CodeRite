@@ -26,3 +26,6 @@ python-magic-bin; sys_platform == 'win32'
 python-magic==0.4.27; sys_platform != 'win32'
 gunicorn
 uvicorn[standard]
+cryptography==42.0.5
+slowapi==0.1.9
+PyJWT==2.8.0

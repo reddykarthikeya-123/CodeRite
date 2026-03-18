@@ -39,17 +39,19 @@ function App() {
     "Generating actionable feedback..."
   ];
 
-  // Animate loading text
+  // Animate loading text - fixed dependency array
   useEffect(() => {
-    if (uploading) {
-      const interval = setInterval(() => {
-        setLoadingStage((prev) => (prev + 1) % loadingStages.length);
-      }, 3500);
-      return () => clearInterval(interval);
-    } else {
+    if (!uploading) {
       setLoadingStage(0);
+      return;
     }
-  }, [uploading, loadingStages.length]);
+    
+    const interval = setInterval(() => {
+      setLoadingStage((prev) => (prev + 1) % loadingStages.length);
+    }, 3500);
+    
+    return () => clearInterval(interval);
+  }, [uploading]); // Removed loadingStages.length - not needed
 
   // Add keyboard shortcut for settings
   useEffect(() => {
@@ -60,14 +62,19 @@ function App() {
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    
-    // Check if first-time user
-    const hasVisited = localStorage.getItem('hasVisited');
-    if (!hasVisited) {
-      setShowOnboarding(true);
-      localStorage.setItem('hasVisited', 'true');
+
+    // Check if first-time user with safe localStorage access
+    try {
+      const hasVisited = localStorage.getItem('hasVisited');
+      if (!hasVisited) {
+        setShowOnboarding(true);
+        localStorage.setItem('hasVisited', 'true');
+      }
+    } catch {
+      // localStorage unavailable (private browsing, disabled, etc.), skip onboarding
+      console.warn('localStorage unavailable, skipping onboarding check');
     }
-    
+
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
@@ -81,7 +88,7 @@ function App() {
       const result = await analyzeDocument(content, "", category, images, fileType);
       setDocReviewResult({ ...result, filename });
     } catch (err) {
-      console.error(err);
+      console.error('Document analysis error:', err);
       setUploadError("Analysis failed. Please check the backend and configuration.");
     } finally {
       setUploading(false);
@@ -698,7 +705,7 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
   const codeExtensions = ['.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.c', '.cpp', '.h', '.hpp',
     '.cs', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.r',
     '.m', '.mm', '.sql', '.sh', '.bash', '.zsh', '.ps1', '.html', '.css',
-    '.scss', '.sass', '.left', '.vue', '.svelte', '.json', '.xml', '.yaml',
+    '.scss', '.sass', '.less', '.vue', '.svelte', '.json', '.xml', '.yaml',
     '.yml', '.toml', '.ini', '.cfg', '.conf', '.md', '.rst', '.txt'];
 
   const nonCodeExtensions = ['.xlsx', '.xls', '.csv', '.pdf', '.docx', '.doc', '.pptx', '.ppt',

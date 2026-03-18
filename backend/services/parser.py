@@ -91,17 +91,30 @@ async def parse_file(file: UploadFile) -> dict:
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File size exceeds 50MB limit")
 
-    # 4. MIME type validation using python-magic (optional, requires libmagic installed)
-    if MAGIC_AVAILABLE:
-        mime_type = magic.from_buffer(content, mime=True)
-        # Be more flexible for text/plain as many code files are identified as text/plain
-        if mime_type not in ALLOWED_MIME_TYPES and not (ext in [".py", ".js", ".ts", ".json", ".html", ".css", ".md", ".txt"] and mime_type.startswith("text/")):
-            # Log a warning but allow the file - be flexible for development environments
-            if not mime_type.startswith("text/"):
-                logger.warning(f"MIME type mismatch for '{filename}': detected '{mime_type}', allowing based on extension")
-    else:
-        # Skip MIME validation if magic not available (e.g., Windows without libmagic)
-        logger.debug(f"Skipping MIME validation for '{filename}' (libmagic not installed)")
+    # 4. MIME type validation using python-magic (MANDATORY for security)
+    if not MAGIC_AVAILABLE:
+        logger.error("python-magic is not available. This is a security requirement.")
+        raise HTTPException(
+            status_code=500,
+            detail="Server configuration error: MIME validation unavailable. Please contact support."
+        )
+    
+    mime_type = magic.from_buffer(content, mime=True)
+    
+    # Validate MIME type matches expected types
+    if mime_type not in ALLOWED_MIME_TYPES:
+        # Allow text/plain for code files
+        if not (ext in [".py", ".js", ".ts", ".json", ".html", ".css", ".md", ".txt"] and mime_type.startswith("text/")):
+            logger.warning(f"MIME type mismatch for '{filename}': detected '{mime_type}', expected one of {ALLOWED_MIME_TYPES}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"File type mismatch. The uploaded file appears to be a {mime_type}, not a valid {ext} file."
+            )
+    
+    # 5. Additional content validation for PDFs
+    if filename.endswith(".pdf"):
+        if not content.startswith(b"%PDF"):
+            raise HTTPException(status_code=400, detail="Invalid PDF file signature detected.")
 
     # Reset file pointer or use content directly for parsing
     # Since we already read it into 'content', we'll modify parsers to accept bytes or use io.BytesIO
@@ -138,26 +151,29 @@ async def _parse_pdf_from_bytes(content: bytes) -> Tuple[str, List[str]]:
     Returns:
         A tuple of (extracted_text, list_of_base64_images).
     """
+    import asyncio
+    
     text = ""
     base64_images = []
 
-    with pdfplumber.open(io.BytesIO(content)) as pdf:
-        for i, page in enumerate(pdf.pages):
-            page_text = page.extract_text(layout=True)
-            if page_text:
-                text += f"\n--- Page {i+1} Text ---\n{page_text}\n"
-
-            tables = page.extract_tables()
-            if tables:
-                text += f"\n--- Page {i+1} Tables ---\n"
-                for table_idx, table in enumerate(tables):
-                    text += f"Table {table_idx + 1}:\n"
-                    for row in table:
-                        cleaned_row = [str(cell).replace("\n", " ").strip() if cell is not None else "" for cell in row]
-                        text += "| " + " | ".join(cleaned_row) + " |\n"
-                    text += "\n"
-
     try:
+        with pdfplumber.open(io.BytesIO(content)) as pdf:
+            for i, page in enumerate(pdf.pages):
+                page_text = page.extract_text(layout=True)
+                if page_text:
+                    text += f"\n--- Page {i+1} Text ---\n{page_text}\n"
+
+                tables = page.extract_tables()
+                if tables:
+                    text += f"\n--- Page {i+1} Tables ---\n"
+                    for table_idx, table in enumerate(tables):
+                        text += f"Table {table_idx + 1}:\n"
+                        for row in table:
+                            cleaned_row = [str(cell).replace("\n", " ").strip() if cell is not None else "" for cell in row]
+                            text += "| " + " | ".join(cleaned_row) + " |\n"
+                        text += "\n"
+
+        # Process images with OCR in non-blocking manner
         images = convert_from_bytes(content)
         for i, img in enumerate(images):
             buffered = io.BytesIO()
@@ -165,8 +181,9 @@ async def _parse_pdf_from_bytes(content: bytes) -> Tuple[str, List[str]]:
             img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
             base64_images.append(img_b64)
 
-            if len(text.strip()) < 100 * len(images): 
-                ocr_text = pytesseract.image_to_string(img)
+            # Run blocking OCR in thread pool to avoid blocking event loop
+            if len(text.strip()) < 100 * len(images):
+                ocr_text = await asyncio.to_thread(pytesseract.image_to_string, img)
                 text += f"\n--- OCR Page {i+1} ---\n" + ocr_text + "\n"
     except Exception as e:
         logger.warning(f"OCR/Vision warning on PDF: {e}")
