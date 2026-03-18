@@ -149,16 +149,16 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
                 </button>
             </div>
 
-            <div className="flex-1 flex flex-col overflow-hidden relative z-0">
+            <div className="flex-1 relative overflow-hidden z-0">
                 <AnimatePresence mode="wait">
                     {activeTab === 'files' ? (
                         <motion.div
                             key="files"
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
+                            exit={{ opacity: 0, x: -20 }}
                             transition={{ duration: 0.2 }}
-                            className="flex-1 flex flex-col overflow-hidden w-full h-full"
+                            className="absolute inset-0 flex flex-col overflow-hidden"
                         >
                             <div
                                 className={`flex-1 flex flex-col items-center justify-center relative border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-300 ease-out cursor-pointer
@@ -228,19 +228,21 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
                     ) : (
                         <motion.div
                             key="paste"
-                            initial={{ opacity: 0, x: 20 }}
+                            initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -20 }}
                             transition={{ duration: 0.2 }}
-                            className="flex-1 flex flex-col w-full h-full"
+                            className="absolute inset-0 flex flex-col overflow-hidden"
                         >
-                            <textarea
-                                value={pastedCode}
-                                onChange={(e) => setPastedCode(e.target.value)}
-                                placeholder="Paste your source code here for analysis..."
-                                className="flex-1 w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-6 font-mono text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400/50 resize-none custom-scrollbar shadow-inner"
-                                spellCheck={false}
-                            />
+                            <div className="flex-1 flex flex-col items-center relative border-2 border-dashed rounded-2xl p-6 transition-all duration-300 ease-out bg-slate-50/50 overflow-hidden">
+                                <textarea
+                                    value={pastedCode}
+                                    onChange={(e) => setPastedCode(e.target.value)}
+                                    placeholder="Paste your source code here for analysis..."
+                                    className="w-full h-full bg-transparent border-0 p-6 font-mono text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400/50 resize-none custom-scrollbar"
+                                    spellCheck={false}
+                                />
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>

@@ -838,16 +838,16 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
         </button>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden relative z-0">
+      <div className="flex-1 relative overflow-hidden z-0">
         <AnimatePresence mode="wait">
           {activeTab === 'files' ? (
             <motion.div
               key="files"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
+              exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
-              className="h-full flex flex-col w-full overflow-hidden"
+              className="absolute inset-0 flex flex-col overflow-hidden"
             >
               <div
                 className={`h-full flex flex-col items-center relative border-2 border-dashed rounded-2xl p-0 text-center transition-all duration-300 ease-out cursor-pointer overflow-hidden
@@ -951,18 +951,18 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
           ) : (
             <motion.div
               key="paste"
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
-              className="h-full flex flex-col w-full"
+              className="absolute inset-0 flex flex-col overflow-hidden"
             >
-              <div className="h-full flex flex-col relative border-2 border-dashed rounded-2xl transition-all duration-300 border-slate-200 bg-slate-50/50 overflow-hidden">
+              <div className="flex-1 flex flex-col items-center relative border-2 border-dashed rounded-2xl transition-all duration-300 border-slate-200 bg-slate-50/50 overflow-hidden">
                 <textarea
                   value={pastedCode}
                   onChange={(e) => setPastedCode(e.target.value)}
                   placeholder="Paste your source code here for analysis..."
-                  className="w-full h-full bg-transparent border-0 p-6 font-mono text-sm text-slate-700 focus:outline-none focus:ring-0 resize-none custom-scrollbar"
+                  className="w-full h-full min-w-full bg-transparent border-0 p-6 font-mono text-sm text-slate-700 focus:outline-none focus:ring-0 resize-none custom-scrollbar"
                   spellCheck={false}
                 />
               </div>
