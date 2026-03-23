@@ -29,7 +29,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 # Import security utilities
-from utils.security import encrypt_api_key, decrypt_api_key, mask_api_key
+from utils.security import mask_api_key
 
 # Rate limiting setup
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -171,20 +171,16 @@ async def create_connection(request: Request, conn: ConnectionCreate, db: AsyncS
         if conn.api_key and len(conn.api_key) < 10:
             raise HTTPException(status_code=400, detail="API key appears too short. Please check your API key.")
         
-        # Encrypt API key before storage
-        encrypted_key = None
+        # Store API key in plaintext as requested
+        plaintext_key = None
         if conn.api_key:
-            try:
-                encrypted_key = encrypt_api_key(conn.api_key)
-            except Exception as e:
-                logger.error(f"Failed to encrypt API key: {e}")
-                raise HTTPException(status_code=500, detail="Failed to encrypt API key")
+            plaintext_key = conn.api_key
         
         new_conn = AIConnection(
             name=conn.name,
             provider=conn.provider,
             model_name=conn.model_name,
-            api_key=encrypted_key,
+            api_key=plaintext_key,
             is_active=False
         )
         
@@ -221,13 +217,9 @@ async def update_connection(request: Request, conn_id: int, conn: ConnectionCrea
         existing_conn.provider = conn.provider
         existing_conn.model_name = conn.model_name
         
-        # Encrypt new API key if provided
-        if conn.api_key is not None:
-            try:
-                existing_conn.api_key = encrypt_api_key(conn.api_key)
-            except Exception as e:
-                logger.error(f"Failed to encrypt API key: {e}")
-                raise HTTPException(status_code=500, detail="Failed to encrypt API key")
+        # Store new API key if provided and not empty
+        if conn.api_key and conn.api_key.strip():
+            existing_conn.api_key = conn.api_key
 
         await db.commit()
         return {"status": "updated"}
@@ -340,14 +332,10 @@ async def analyze_document(request: Request, analysis_request: AnalysisRequest, 
                 detail="No active AI connection found. Please configure one in Settings."
             )
 
-        # Decrypt API key
+        # Use API key directly
         api_key = ""
         if active_conn.api_key:
-            try:
-                api_key = decrypt_api_key(active_conn.api_key)
-            except Exception as e:
-                logger.error(f"Failed to decrypt API key: {e}")
-                raise HTTPException(status_code=500, detail="Failed to decrypt API key")
+            api_key = active_conn.api_key
 
         provider = active_conn.provider
         model_name = active_conn.model_name
@@ -396,15 +384,24 @@ async def analyze_code(request: Request, code_request: CodeAnalysisRequest, db: 
                         status_code=400,
                         detail=f"This is not a code document. The file '{f.filename}' appears to be a {ext.upper()} file, which is not suitable for code review. Please upload source code files only (e.g., .py, .js, .ts, .java, etc.)."
                     )
+            
+            # Handle .car binary payloads sent as base64 from React
+            if filename_lower.endswith('.car') and f.content.startswith('data:'):
+                try:
+                    import base64
+                    from services.parser import _parse_car_from_bytes
+                    b64_str = f.content.split('base64,')[1]
+                    binary_content = base64.b64decode(b64_str)
+                    car_text, _ = await _parse_car_from_bytes(binary_content)
+                    f.content = car_text
+                except Exception as e:
+                    logger.error(f"Failed to process .car file {f.filename}: {e}")
+                    raise HTTPException(status_code=400, detail=f"Failed to process archive '{f.filename}': {str(e)}")
 
-        # Decrypt API key
+        # Use API key directly
         api_key = ""
         if active_conn.api_key:
-            try:
-                api_key = decrypt_api_key(active_conn.api_key)
-            except Exception as e:
-                logger.error(f"Failed to decrypt API key: {e}")
-                raise HTTPException(status_code=500, detail="Failed to decrypt API key")
+            api_key = active_conn.api_key
 
         provider = active_conn.provider
         model_name = active_conn.model_name
@@ -437,14 +434,10 @@ async def auto_fix_code(request: Request, auto_fix_request: CodeAutoFixRequest, 
         if not auto_fix_request.selected_suggestions:
             return {"fixed_code": auto_fix_request.content}
 
-        # Decrypt API key
+        # Use API key directly
         api_key = ""
         if active_conn.api_key:
-            try:
-                api_key = decrypt_api_key(active_conn.api_key)
-            except Exception as e:
-                logger.error(f"Failed to decrypt API key: {e}")
-                raise HTTPException(status_code=500, detail="Failed to decrypt API key")
+            api_key = active_conn.api_key
 
         provider = active_conn.provider
         model_name = active_conn.model_name
@@ -486,14 +479,10 @@ async def auto_fix_code_batch(request: Request, batch_request: CodeAutoFixBatchR
                 ]
             }
 
-        # Decrypt API key
+        # Use API key directly
         api_key = ""
         if active_conn.api_key:
-            try:
-                api_key = decrypt_api_key(active_conn.api_key)
-            except Exception as e:
-                logger.error(f"Failed to decrypt API key: {e}")
-                raise HTTPException(status_code=500, detail="Failed to decrypt API key")
+            api_key = active_conn.api_key
 
         provider = active_conn.provider
         model_name = active_conn.model_name

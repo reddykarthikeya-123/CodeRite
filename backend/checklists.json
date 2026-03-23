@@ -3,7 +3,9 @@
     "Business Requirements document",
     "Configuration Document",
     "Functional Design Document",
-    "Test Scripts"
+    "Test Scripts",
+    "Oracle Integration Code Review",
+    "OIC Naming Conventions & Best Practices"
   ],
   "data": {
     "Business Requirements document": [
@@ -641,6 +643,535 @@
       {
         "QA Reviewer Name": NaN,
         "Unnamed: 1": "Final script is approved and signed off for use in UAT or SIT.",
+        "Unnamed: 2": NaN
+      }
+    ],
+    "Oracle Integration Code Review": [
+      {
+        "QA Reviewer Name": "Section",
+        "Unnamed: 1": "Checklist Item",
+        "Unnamed: 2": "Review Result"
+      },
+      {
+        "QA Reviewer Name": "Section 1: Integration Design Review",
+        "Unnamed: 1": "Does the integration name align with naming standards?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does the integration name address the business purpose?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does The integration Versioning Defined Properly?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does integration description added in Integration level?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is the selected Integration pattern suitable and justified for the business solution?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does integration have any hardcoded URL\u2019s or credentials?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is Proper tracking defined for the integrations?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is integration placed in the correct folder structure or project?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are lookups used instead of hardcoding?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Integration reusable?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is Orchestration justified, or could it be simplified?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Section 2: Connections & Security",
+        "Unnamed: 1": "Does the connection name follows naming standards?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Did the connection used appropriate authentication method? (Like OAuth/Basic/API Key)",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Did connections have hardcoded credentials?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does the security policies are added for each connection?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "For third party connection SSL Certification validated for expiry?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Section 3: Lookups & Cross-Reference",
+        "Unnamed: 1": "Are lookup names conforming to naming standards?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is the lookup placed in the appropriate folder?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are hard-coded values avoided and replaced with lookups where applicable?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are lookup values properly documented in the design document?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is there proper error handling for missing lookup or cross-reference values?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are lookups environment-independent (no environment-specific hardcoding)?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Has impact analysis been performed before modifying existing lookup values?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Section 4: Orchestration & Mapping",
+        "Unnamed: 1": "Did the integration modularize the business logic appropriately?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are scope blocks used appropriately within the integration?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are fault handlers implemented where required?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is a global fault handler configured for the integration?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are switch conditions optimized for better performance and readability?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are for-each loops optimized to handle data efficiently?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does the integration avoid unnecessary nested loops?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are data mappings clean, structured, and easy to understand?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are lookup tables used instead of hard-coded values inside mapping?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are cross-references used properly wherever required?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Has large payload handling been considered in the integration design?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is retry logic implemented where external system failures may occur?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Section 5: Error Handling & Logging",
+        "Unnamed: 1": "Does the global fault handler is implemented?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does the error Logged for tracking ?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does the retry mechanism implemented where required?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are business errors and technical errors handled separately?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are meaningful error messages returned for failure scenarios?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does the integration avoid logging sensitive data?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are notifications (Email/Teams) configured for failure scenarios?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are integration instance tracking and business identifiers configured?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Section 6: Performance & Optimization",
+        "Unnamed: 1": "Does the integration avoid unnecessary database calls?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does the integration avoid making external calls inside loops?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is pagination used when processing large datasets?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is parallel processing used where appropriate to improve performance?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Has high-volume testing been completed for the integration?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is the payload size optimized for performance?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is payload streaming or stage file used for very large files?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Section 7: External System Compliance",
+        "Unnamed: 1": "Are standard APIs used?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are REST / SOAP / FBDI services used appropriately?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is Business Unit / Multi-Org handling validated?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is data validation performed before submission?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is idempotency handled where required?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Section 8: Testing and Deployment",
+        "Unnamed: 1": "Are Unit test cases add for each integration?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Did negative scenarios are tested?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Did error scenarios are validated and tested to ensure proper error handling?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Has the deployment checklist been followed before migration?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Has the .IAR file been validated before migrating to the target environment?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Has a post-deployment smoke test been completed successfully?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Section 9: Scheduling (If Applicable)",
+        "Unnamed: 1": "Does the scheduling frequency configured appropriately based on business requirement?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does the time zone been validated for the scheduling integration?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does the alerts are configured for integration failures?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Did the overlapping integration run prevention implemented?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Section 10: Standards & Governance",
+        "Unnamed: 1": "Are naming standards followed across all integration artifacts?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Are there any test endpoints present in the Production environment?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does the integration avoid environment-specific hardcoding?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is the documentation updated to reflect the latest changes?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Is the change ticket referenced in the integration?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Has the integration version been updated before migration?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Section 11: Other",
+        "Unnamed: 1": "Do all names conform to standards?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does functional Documentation exist? Is it clear and complete?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does the TDD Document cover all the required details along with flow chart?",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Does testcase document cover all the positive and negative scenarios and been tested?",
+        "Unnamed: 2": NaN
+      }
+    ],
+    "OIC Naming Conventions & Best Practices": [
+      {
+        "QA Reviewer Name": "Section",
+        "Unnamed: 1": "Checklist Item",
+        "Unnamed: 2": "Review Result"
+      },
+      {
+        "QA Reviewer Name": "General Naming Guidelines",
+        "Unnamed: 1": "All names are spelled out fully without unapproved abbreviations (exceptions include common accepted terms like ERP, HCM, AR, AP, SF).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Artifact names use only alphanumeric characters and underscores or Pascal Case.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "No special characters are used in names (avoid spaces, '.', '$', '%', '#', []).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Artifact types are clearly indicated using suffixes (e.g., COUNTRIES_LOOKUP).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Project names conform to standard convention `<CUST_PREFIX>_<MODULE_NAME>_PROJECT`.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Common utility assets are grouped in a common project `<CUST_PREFIX>_COMMON_PROJECT`.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Integration Design",
+        "Unnamed: 1": "Integration Flow names conform strictly to `<CUST_PREFIX>_<INT_NUM>_<SOURCE>_<TARGET>_<DATA_OBJECT>_<OPERATION>_<TYPE>`.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Connection names adhere to `<CUST_PREFIX>_<SYSTEM>_<ADAPTER_NAME>` and duplication is minimal.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Lookups properly indicate their short purpose and end with `_LKP` prefix.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Initial lookup variables are assigned locally instead of mapped directly inside flow blocks.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Code Components & Variables",
+        "Unnamed: 1": "Assignment tasks are prefixed with 'Assign' (e.g., AssignOrderValues).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Data Stitch tasks denote their operation via 'Assign', 'Append', or 'Remove'.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Scope blocks are explicitly labeled with suffix `Scope` or `{Scope}`.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "For-each iteration blocks begin with `IterateOver` or `ForEach`.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "While loops begin with `While` and specify the condition concisely.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Logger blocks begin with `Log` to clearly designate what is being logged.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Notification modules start with `Email` followed by topic context.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "XML & Schema Mapping",
+        "Unnamed: 1": "Lower-Camel-case is maintained for all XML attributes.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Upper-Camel-case is maintained for all XML complex elements and type names.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Names remain singular unless strictly representing arrays.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "All complex schemas maintain the 'Type' suffix descriptor (e.g., InvoiceEBOType).",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": "Architectural Best Practices",
+        "Unnamed: 1": "Integration relies on appropriate shared central connections rather than creating redundant developer connections.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Scheduled routines use list limits appropriately and don't loop endlessly; run-now triggers or schedule params are utilized where possible.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Synchronous integration complexity is minimized to basic handoffs; avoids performing large monolithic processing inside blocking calls.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Processors don't buffer massive entire payload files into memory; Stage File chunking / Segment iteration is preferred.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Chatty per-record API invocations are avoided; external API batched calls (200, 1000 records context) are mapped.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "IAR updates or complex XSLs occur strictly within Mapper import functions, bypassing manual XML outside edits.",
+        "Unnamed: 2": NaN
+      },
+      {
+        "QA Reviewer Name": NaN,
+        "Unnamed: 1": "Underlying DB / REST limits are analyzed in line with payload estimates to avoid abrupt buffer limits.",
         "Unnamed: 2": NaN
       }
     ]

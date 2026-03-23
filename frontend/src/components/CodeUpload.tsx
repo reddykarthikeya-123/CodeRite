@@ -18,7 +18,7 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
                           '.cs', '.go', '.rs', '.rb', '.php', '.swift', '.kt', '.scala', '.r', 
                           '.m', '.mm', '.sql', '.sh', '.bash', '.zsh', '.ps1', '.html', '.css', 
                           '.scss', '.sass', '.less', '.vue', '.svelte', '.json', '.xml', '.yaml', 
-                          '.yml', '.toml', '.ini', '.cfg', '.conf', '.md', '.rst', '.txt'];
+                          '.yml', '.toml', '.ini', '.cfg', '.conf', '.md', '.rst', '.txt', '.car'];
     
     const nonCodeExtensions = ['.xlsx', '.xls', '.csv', '.pdf', '.docx', '.doc', '.pptx', '.ppt',
                               '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.ico', '.webp',
@@ -52,8 +52,19 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
             }
 
             try {
-                const text = await file.text();
-                newFiles.push({ file, content: text });
+                if (filename.endsWith('.car')) {
+                    // Read as Base64 data URL for binary processing on backend
+                    const dataUrl = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.onerror = () => reject(reader.error);
+                        reader.readAsDataURL(file);
+                    });
+                    newFiles.push({ file, content: dataUrl });
+                } else {
+                    const text = await file.text();
+                    newFiles.push({ file, content: text });
+                }
             } catch (err) {
                 console.error(`Error reading ${file.name}:`, err);
                 setError(`Failed to read ${file.name}. Please try again.`);

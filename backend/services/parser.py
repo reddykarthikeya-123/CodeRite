@@ -34,7 +34,7 @@ except ImportError:
 MAX_FILE_SIZE = 50 * 1024 * 1024
 
 # Whitelisted extensions
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".pptx", ".txt", ".md", ".py", ".js", ".ts", ".json", ".html", ".css", ".xlsx", ".xls", ".csv"}
+ALLOWED_EXTENSIONS = {".pdf", ".docx", ".pptx", ".txt", ".md", ".py", ".js", ".ts", ".json", ".html", ".css", ".xlsx", ".xls", ".csv", ".car"}
 
 # Allowed MIME types
 ALLOWED_MIME_TYPES = {
@@ -50,7 +50,10 @@ ALLOWED_MIME_TYPES = {
     "text/css",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.ms-excel",
-    "text/csv"
+    "text/csv",
+    "application/zip",
+    "application/octet-stream",
+    "application/x-zip-compressed"
 }
 
 def sanitize_filename(filename: str) -> str:
@@ -135,6 +138,8 @@ async def parse_file(file: UploadFile) -> dict:
         elif filename.endswith((".xlsx", ".xls", ".csv")):
             text_content = await _parse_excel_from_bytes(content, filename)
             images = []
+        elif filename.endswith(".car"):
+            text_content, images = await _parse_car_from_bytes(content)
 
         return {"text": text_content, "images": images}
     except Exception as e:
@@ -287,3 +292,42 @@ async def _parse_excel_from_bytes(content: bytes, filename: str) -> str:
             text += df.to_csv(index=False) + "\n"
     return text
 
+import zipfile
+async def _parse_car_from_bytes(content: bytes) -> Tuple[str, List[str]]:
+    """Recursively extract XML, XSL, WSDL, and properties from .car and .iar archives."""
+    text_parts = []
+    images = []
+    
+    def process_zip_content(zip_bytes, prefix=""):
+        try:
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
+                for info in z.infolist():
+                    if info.is_dir():
+                        continue
+                    filename = info.filename.lower()
+                    
+                    if filename.endswith(('.xml', '.xsl', '.wsdl', '.properties', '.jpr', '.jca', '.xqy')):
+                        file_data = z.read(info.filename)
+                        try:
+                            decoded = file_data.decode('utf-8')
+                        except UnicodeDecodeError:
+                            decoded = file_data.decode('latin-1', errors='ignore')
+                        text_parts.append(f"\n--- {prefix}{info.filename} ---\n{decoded}\n")
+                    
+                    elif filename.endswith('.iar'):
+                        file_data = z.read(info.filename)
+                        text_parts.append(f"\n--- Entering nested archive: {prefix}{info.filename} ---\n")
+                        process_zip_content(file_data, prefix + info.filename + " -> ")
+                        
+        except Exception as e:
+            text_parts.append(f"\n[Error extracting archive: {str(e)}]\n")
+
+    process_zip_content(content)
+    text = "".join(text_parts)
+    
+    # Cap string length at 250,000 characters to prevent LLM connection timeouts / token limits
+    if len(text) > 250000:
+        logger.warning(f"Car file extraction exceeded 250k chars. Truncating.")
+        text = text[:250000] + "\n\n...[CONTENT TRUNCATED DUE TO MAXIMUM TOKEN LIMITS]..."
+        
+    return text, images
