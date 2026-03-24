@@ -60,6 +60,21 @@ function App() {
     return () => clearInterval(interval);
   }, [uploading]); // Removed loadingStages.length - not needed
 
+  // Manage body scroll lock for home page
+  useEffect(() => {
+    const isHome = !currentFile && !uploading && !docReviewResult && !codeReviewResult;
+    
+    if (isHome) {
+      document.body.classList.add('no-scroll');
+    } else {
+      document.body.classList.remove('no-scroll');
+    }
+    
+    return () => {
+      document.body.classList.remove('no-scroll');
+    };
+  }, [currentFile, uploading, docReviewResult, codeReviewResult]);
+
   // Add keyboard shortcut for settings
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -186,7 +201,7 @@ function App() {
   };
 
   return (
-    <div className={`flex flex-col min-h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9] text-slate-900 font-sans selection:bg-[#1E40AF]/10 selection:text-[#1E40AF] ${
+    <div className={`flex flex-col min-h-screen overflow-x-hidden bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9] text-slate-900 font-sans selection:bg-[#1E40AF]/10 selection:text-[#1E40AF] ${
       !currentFile && !uploading && !docReviewResult && !codeReviewResult ? 'home-page-no-scroll' : ''
     }`}>
       {/* Settings Modal */}

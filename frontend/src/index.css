@@ -24,18 +24,25 @@
   --neutral-900: #0F172A;
 }
 
+/* Global Reset - Fixed for proper scrolling */
 html, body {
-  overflow-y: auto;
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden; /* Prevents horizontal scrollbar globally */
 }
 
 body {
   background-color: var(--neutral-50);
 }
 
+/* Body scroll lock for home page */
+body.no-scroll {
+  overflow: hidden;
+}
+
 /* Hide scrollbar on home page upload view */
 .home-page-no-scroll {
+  height: 100vh;
   overflow: hidden !important;
 }
 
