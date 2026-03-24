@@ -45,6 +45,7 @@ export interface AnalyzeDocumentRequest {
   document_category?: string;
   images: string[];
   file_type?: string;
+  enabled_checks?: string[];
 }
 
 export interface AnalyzeCodeRequest {

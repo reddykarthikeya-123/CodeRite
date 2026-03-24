@@ -110,6 +110,7 @@ class AnalysisRequest(BaseModel):
     custom_instructions: Optional[str] = ""
     document_category: str
     file_type: Optional[str] = None
+    enabled_checks: Optional[List[str]] = None
 
 class CodeFile(BaseModel):
     filename: str
@@ -134,6 +135,25 @@ async def health_check():
 @app.get("/api/checklists")
 async def get_checklists():
     return {"categories": loader.get_categories()}
+
+@app.get("/api/checklists/{category}")
+async def get_checklist_items(category: str):
+    """Get checklist items for a specific category."""
+    items = loader.get_checklist_for_category(category)
+    # Filter out header row and return only items with actual checklist text
+    filtered_items = []
+    for idx, item in enumerate(items):
+        # Support both new format (Section, ChecklistItem) and old format (QA Reviewer Name, Unnamed: 1)
+        check_text = item.get('ChecklistItem') or item.get('checklist_item') or item.get('Unnamed: 1')
+        section = item.get('Section') or item.get('section') or item.get('QA Reviewer Name') or 'General'
+        if check_text and check_text != 'Checklist Item':
+            filtered_items.append({
+                'index': idx,
+                'section': section,
+                'checklist_item': check_text,
+                'original': item
+            })
+    return {'category': category, 'items': filtered_items}
 
 @app.get("/api/connections")
 @limiter.limit("30/minute")
@@ -346,7 +366,8 @@ async def analyze_document(request: Request, analysis_request: AnalysisRequest, 
             analysis_request.images,
             analysis_request.custom_instructions,
             analysis_request.document_category,
-            analysis_request.file_type
+            analysis_request.file_type,
+            analysis_request.enabled_checks
         )
 
         return review_result

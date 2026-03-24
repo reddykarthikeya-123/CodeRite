@@ -139,12 +139,19 @@ export const fetchChecklistCategories = async (): Promise<string[]> => {
   return data.categories || [];
 };
 
+export const fetchChecklistItems = async (category: string): Promise<{ index: number; section: string; checklist_item: string }[]> => {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/checklists/${encodeURIComponent(category)}`);
+  const data = await handleResponse<{ items: { index: number; section: string; checklist_item: string }[] }>(response);
+  return data.items || [];
+};
+
 export const analyzeDocument = async (
   text: string,
   customInstructions: string,
   documentCategory?: string,
   images?: string[],
-  fileType?: string
+  fileType?: string,
+  enabledChecks?: string[]
 ): Promise<ReviewResponse> => {
   const payload: AnalyzeDocumentRequest = {
     text,
@@ -153,13 +160,14 @@ export const analyzeDocument = async (
   };
   if (documentCategory) payload.document_category = documentCategory;
   if (fileType) payload.file_type = fileType;
+  if (enabledChecks) payload.enabled_checks = enabledChecks;
 
   const response = await fetchWithTimeout(`${API_BASE_URL}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   }, 120000); // 2 minute timeout for analysis
-  
+
   return handleResponse<ReviewResponse>(response);
 };
 

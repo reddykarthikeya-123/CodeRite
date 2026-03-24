@@ -3,7 +3,8 @@ import { ConfigurationPanel } from './components/ConfigurationPanel';
 import { ReviewResult } from './components/ReviewResult';
 import { CodeResult, type CodeAnalysisResponse } from './components/CodeResult';
 import { Modal } from './components/Modal';
-import { analyzeDocument, analyzeCode, fetchChecklistCategories, type ReviewResponse } from './api';
+import { ChecklistFilterModal } from './components/ChecklistFilterModal';
+import { analyzeDocument, analyzeCode, fetchChecklistCategories, fetchChecklistItems, type ReviewResponse } from './api';
 import { Loader2, Settings, ArrowLeft, ListChecks, Upload, FileText, UploadCloud, FileCode2, Code2, Trash2, X, AlertTriangle, FileUp, HelpCircle, Lightbulb } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -22,6 +23,12 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [categories, setCategories] = useState<string[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  // Checklist filter state
+  const [showChecklistFilter, setShowChecklistFilter] = useState(false);
+  const [checklistItems, setChecklistItems] = useState<{ index: number; section: string; checklist_item: string; original: Record<string, unknown> }[]>([]);
+  const [pendingFile, setPendingFile] = useState<{ file: File, category: string } | null>(null);
+  const [_enabledChecks, _setEnabledChecks] = useState<string[]>([]); // Track for future use
 
   // Load categories on mount
   useEffect(() => {
@@ -78,20 +85,77 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleFileProcessed = async (content: string, filename: string, category: string, images?: string[], fileType?: string) => {
+  const handleFileProcessed = async (content: string, filename: string, category: string, images?: string[], fileType?: string, checks?: string[]) => {
     setCurrentFile({ content, filename });
     setDocReviewResult(null);
     setCodeReviewResult(null);
     setUploading(true);
 
     try {
-      const result = await analyzeDocument(content, "", category, images, fileType);
+      const result = await analyzeDocument(content, "", category, images, fileType, checks);
       setDocReviewResult({ ...result, filename });
     } catch (err) {
       console.error('Document analysis error:', err);
       setUploadError("Analysis failed. Please check the backend and configuration.");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File, category: string) => {
+    console.log('[handleFileUpload] Starting...', { file: file.name, category });
+    // Fetch checklist items and show filter modal
+    try {
+      console.log('[handleFileUpload] Fetching checklist items...');
+      const items = await fetchChecklistItems(category);
+      console.log('[handleFileUpload] Received items:', items.length);
+      // Add empty original object to match the type
+      const itemsWithOriginal = items.map(item => ({
+        ...item,
+        original: {} as Record<string, unknown>
+      }));
+      console.log('[handleFileUpload] Setting state...');
+      setChecklistItems(itemsWithOriginal);
+      setPendingFile({ file, category });
+      setShowChecklistFilter(true);
+      console.log('[handleFileUpload] Modal should be open now');
+    } catch (err) {
+      console.error('[handleFileUpload] Error:', err);
+      setUploadError("Failed to load checklist items. Please try again.");
+      setTimeout(() => setUploadError(null), 5000);
+    }
+  };
+
+  const handleChecklistApply = async (selectedChecks: string[]) => {
+    console.log('[handleChecklistApply] Received', selectedChecks.length, 'selected checks:', selectedChecks);
+    _setEnabledChecks(selectedChecks);
+    setShowChecklistFilter(false);
+
+    // Now process the file with the selected checks
+    if (pendingFile) {
+      const { file, category } = pendingFile;
+      const fileType = file.name.split('.').pop()?.toLowerCase() || '';
+
+      // Show loading immediately before async upload starts
+      setCurrentFile({ content: '', filename: file.name });
+      setUploading(true);
+
+      // Read file and upload
+      const { uploadFile } = await import('./api');
+      uploadFile(file)
+        .then(data => {
+          console.log('[handleChecklistApply] File uploaded, sending to analyze with', selectedChecks.length, 'checks');
+          handleFileProcessed(data.text, data.filename || file.name, category, data.images, fileType, selectedChecks);
+        })
+        .catch(err => {
+          console.error('Upload error:', err);
+          setUploadError(`Upload Failed: ${err instanceof Error ? err.message : String(err)}`);
+          setUploading(false);
+          setCurrentFile(null);
+        })
+        .finally(() => {
+          setPendingFile(null);
+        });
     }
   };
 
@@ -255,6 +319,7 @@ function App() {
                         >
                           <FileUploadDropzone
                             onFileProcessed={handleFileProcessed}
+                            onFileUpload={handleFileUpload}
                             uploading={uploading}
                             setUploading={setUploading}
                             error={uploadError}
@@ -376,7 +441,7 @@ function App() {
               <p className="text-xs text-slate-600 mt-1">Validate functional designs, requirements, and test scripts against enterprise compliance frameworks.</p>
             </div>
           </div>
-          
+
           <div className="space-y-3">
             <h5 className="font-bold text-slate-700 text-sm">How it works:</h5>
             <div className="space-y-2">
@@ -411,6 +476,20 @@ function App() {
           </button>
         </div>
       </Modal>
+
+      {/* Checklist Filter Modal */}
+      <ChecklistFilterModal
+        isOpen={showChecklistFilter}
+        onClose={() => setShowChecklistFilter(false)}
+        onApply={handleChecklistApply}
+        checklistItems={checklistItems.map(item => ({
+          index: item.index,
+          section: item.section,
+          checklist_item: item.checklist_item,
+          ...item.original
+        }))}
+        categoryName={pendingFile?.category || selectedCategory}
+      />
     </div>
   );
 }
@@ -471,7 +550,8 @@ const FileUploadSelector: React.FC<FileUploadSelectorProps> = ({
 
 // FileUploadDropzone Component - Right pane document upload
 interface FileUploadDropzoneProps {
-  onFileProcessed: (content: string, filename: string, category: string, images?: string[], fileType?: string) => void;
+  onFileProcessed: (content: string, filename: string, category: string, images?: string[], fileType?: string, checks?: string[]) => void;
+  onFileUpload: (file: File, category: string) => void;
   uploading: boolean;
   setUploading: (uploading: boolean) => void;
   error: string | null;
@@ -480,9 +560,8 @@ interface FileUploadDropzoneProps {
 }
 
 const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
-  onFileProcessed,
+  onFileUpload,
   uploading,
-  setUploading,
   error,
   onErrorChange,
   selectedCategory,
@@ -498,20 +577,8 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
       setTimeout(() => onErrorChange(null), 5000);
       return;
     }
-    setUploading(true);
-    onErrorChange(null);
-    try {
-      const fileType = file.name.split('.').pop()?.toLowerCase() || '';
-      const { uploadFile } = await import('./api');
-      const data = await uploadFile(file);
-      onFileProcessed(data.text, data.filename || file.name, selectedCategory, data.images, fileType);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      onErrorChange(`Upload Failed: ${errorMessage || 'Unknown error. Please check backend logs.'}`);
-      console.error(errorMessage);
-    } finally {
-      setUploading(false);
-    }
+    // Call parent handler to show checklist filter modal
+    onFileUpload(file, selectedCategory);
   };
 
   const onDragOver = (e: React.DragEvent) => {

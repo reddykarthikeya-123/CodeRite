@@ -9,6 +9,7 @@ from typing import List, Optional
 import json
 import os
 import logging
+import asyncio
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -108,7 +109,7 @@ class AIEngine:
             logger.error(f"Connection test failed: {e}")
             raise Exception(f"{str(e)}")
 
-    async def analyze_document(self, text: str, images: List[str] = None, custom_instructions: str = "", document_category: str = None, file_type: str = None) -> dict:
+    async def analyze_document(self, text: str, images: List[str] = None, custom_instructions: str = "", document_category: str = None, file_type: str = None, enabled_checks: List[str] = None) -> dict:
         """Analyzes a document using the AI model and a target checklist.
 
         Args:
@@ -117,6 +118,7 @@ class AIEngine:
             custom_instructions: Additional instructions for the AI (optional).
             document_category: The category of the document for checklist lookup.
             file_type: The extension of the original file.
+            enabled_checks: List of enabled check IDs (format: "index-checklist_text") to filter checklist items.
 
         Returns:
             A dictionary containing the review results.
@@ -126,7 +128,28 @@ class AIEngine:
         target_checklist = []
         checklist_context = ""
         if document_category:
-            target_checklist = loader.get_checklist_for_category(document_category)
+            all_items = loader.get_checklist_for_category(document_category)
+            
+            # Filter checklist based on enabled_checks if provided
+            if enabled_checks and len(enabled_checks) > 0:
+                # Parse enabled check IDs to get indices
+                enabled_indices = set()
+                for check_id in enabled_checks:
+                    try:
+                        idx = int(check_id.split('-')[0])
+                        enabled_indices.add(idx)
+                    except (ValueError, IndexError):
+                        continue
+                
+                # Filter items to only include enabled checks
+                target_checklist = [
+                    item for idx, item in enumerate(all_items)
+                    if idx in enabled_indices
+                ]
+                logger.info(f"Filtered checklist from {len(all_items)} to {len(target_checklist)} items based on enabled_checks")
+            else:
+                target_checklist = all_items
+            
             checklist_context = "\nTarget Checklist exactly to follow:\n" + json.dumps(target_checklist, indent=2)
 
         # Determine reference format based on file type
@@ -213,35 +236,89 @@ class AIEngine:
         # Check if the selected model supports vision (heuristic)
         supports_vision = any(v in self.model_name.lower() for v in ["gpt-4o", "gemini-1.5", "llava", "vision"])
         
-        # Build multimodal User message only if supported
-        if images and len(images) > 0 and supports_vision:
-            user_content = [{"type": "text", "text": f"Custom Instructions: {custom_instructions}\n\nDocument Content:\n{text}"}]
-            for img_b64 in images:
-                user_content.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
-                })
-        else:
-            user_content = f"Custom Instructions: {custom_instructions}\n\nDocument Content:\n{text}"
-            
-        messages = [
-            SystemMessage(content=system_msg_content),
-            HumanMessage(content=user_content)
-        ]
+        MAX_CHUNK_SIZE = 150000
+        text_chunks = [text[i:i + MAX_CHUNK_SIZE] for i in range(0, len(text), MAX_CHUNK_SIZE)] if text else [""]
         
-        chain = self.llm | self.parser
-        
+        async def process_chunk(chunk_index, chunk_text, semaphore):
+            async with semaphore:
+                # Build multimodal User message only if supported AND only for the first chunk to save tokens
+                if chunk_index == 0 and images and len(images) > 0 and supports_vision:
+                    user_content = [{"type": "text", "text": f"Custom Instructions: {custom_instructions}\n\nDocument Content (Part {chunk_index+1}):\n{chunk_text}"}]
+                    for img_b64 in images:
+                        user_content.append({
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
+                        })
+                else:
+                    user_content = f"Custom Instructions: {custom_instructions}\n\nDocument Content (Part {chunk_index+1}):\n{chunk_text}"
+                    
+                messages = [
+                    SystemMessage(content=system_msg_content),
+                    HumanMessage(content=user_content)
+                ]
+                
+                chain = self.llm | self.parser
+                try:
+                    return await chain.ainvoke(messages)
+                except Exception as e:
+                    logger.error(f"Error processing document chunk {chunk_index}: {e}")
+                    return {"checklist": [], "suggestions": [], "error": str(e)}
+
         try:
-            response = await chain.ainvoke(messages)
+            semaphore = asyncio.Semaphore(3)
+            tasks = [process_chunk(i, chunk, semaphore) for i, chunk in enumerate(text_chunks)]
+            results = await asyncio.gather(*tasks)
+            
+            # Merge results
+            merged_checklist = {}
+            merged_suggestions = []
+            
+            for res in results:
+                # Merge suggestions
+                if "suggestions" in res:
+                    merged_suggestions.extend(res["suggestions"])
+                
+                # Merge checklist with pessimistic conflict resolution (Fail > Warning > Pass)
+                for item in res.get("checklist", []):
+                    key = (item.get("section", ""), item.get("item", ""))
+                    current_status = item.get("status", "").lower()
+                    
+                    if key not in merged_checklist:
+                        merged_checklist[key] = item
+                    else:
+                        existing_status = merged_checklist[key].get("status", "").lower()
+                        # Upgrade severity if needed
+                        if "fail" in current_status:
+                            merged_checklist[key]["status"] = "Fail"
+                            if "fail" not in existing_status:
+                                merged_checklist[key]["comment"] = item.get("comment", "")
+                            else:
+                                merged_checklist[key]["comment"] += "\n" + item.get("comment", "")
+                        elif "warning" in current_status and "fail" not in existing_status:
+                            merged_checklist[key]["status"] = "Warning"
+                            if "warning" not in existing_status:
+                                merged_checklist[key]["comment"] = item.get("comment", "")
+                            else:
+                                merged_checklist[key]["comment"] += "\n" + item.get("comment", "")
+                        else:
+                            # Both Pass or N/A, just append comment if unique
+                            if item.get("comment") and item.get("comment") not in merged_checklist[key].get("comment", ""):
+                                merged_checklist[key]["comment"] += "\n" + item.get('comment', "")
+
+            final_response = {
+                "checklist": list(merged_checklist.values()),
+                "suggestions": merged_suggestions,
+                "rewritten_content": results[0].get("rewritten_content", "") if results else ""
+            }
 
             # Validate and correct page numbers in AI response
-            response = self._validate_page_numbers(response, total_pages, reference_format)
+            final_response = self._validate_page_numbers(final_response, total_pages, reference_format)
 
             # Programmatic Scoring Logic
             valid_items = 0
             score = 0
 
-            for item in response.get("checklist", []):
+            for item in final_response.get("checklist", []):
                 status = str(item.get("status", "")).lower()
                 if "not applicable" in status or "n/a" in status:
                     continue # Skip these entirely from the calculation
@@ -254,11 +331,11 @@ class AIEngine:
                 # fail gets 0
 
             if valid_items == 0:
-                response["score"] = 0
+                final_response["score"] = 0
             else:
                 final_score = int((score / valid_items) * 100)
-                response["score"] = final_score
-            return response
+                final_response["score"] = final_score
+            return final_response
         except Exception as e:
             # Fallback or error handling
             logger.error(f"AI Error: {e}")
@@ -346,24 +423,57 @@ class AIEngine:
         }}
         """
         
-        # Build the user prompt by concatenating all the files, injecting line numbers
-        user_content = "Please review the following code files. Note that each line of code is prefixed with its line number (format: 'line_number | code'):\n\n"
+        # Batching files to prevent exceeding context limits
+        MAX_CHUNK_SIZE = 150000
+        batches = []
+        current_batch = []
+        current_batch_size = 0
+        
         for f in files:
             content_with_lines = "\n".join(f"{i+1} | {line}" for i, line in enumerate(f['content'].split('\n')))
-            user_content += f"=== BEGIN FILE: {f['filename']} ===\n"
-            user_content += f"{content_with_lines}\n"
-            user_content += f"=== END FILE: {f['filename']} ===\n\n"
+            file_str = f"=== BEGIN FILE: {f['filename']} ===\n{content_with_lines}\n=== END FILE: {f['filename']} ===\n\n"
             
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_content)
-        ]
-        
-        code_parser = JsonOutputParser(pydantic_object=CodeAnalysisResponse_Schema)
-        chain = self.llm | code_parser
-        
+            if current_batch_size + len(file_str) > MAX_CHUNK_SIZE and current_batch:
+                batches.append(current_batch)
+                current_batch = [file_str]
+                current_batch_size = len(file_str)
+            else:
+                current_batch.append(file_str)
+                current_batch_size += len(file_str)
+                
+        if current_batch:
+            batches.append(current_batch)
+            
+        async def process_batch(batch_files, semaphore):
+            async with semaphore:
+                user_content = "Please review the following code files. Note that each line of code is prefixed with its line number (format: 'line_number | code'):\n\n"
+                user_content += "".join(batch_files)
+                
+                messages = [
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=user_content)
+                ]
+                
+                code_parser = JsonOutputParser(pydantic_object=CodeAnalysisResponse_Schema)
+                chain = self.llm | code_parser
+                
+                try:
+                    return await chain.ainvoke(messages)
+                except Exception as e:
+                    logger.error(f"Error processing code batch: {e}")
+                    return {"files": [], "error": str(e)}
+
         try:
-            response = await chain.ainvoke(messages)
+            semaphore = asyncio.Semaphore(3)
+            tasks = [process_batch(b, semaphore) for b in batches]
+            results = await asyncio.gather(*tasks)
+            
+            merged_files = []
+            for res in results:
+                if "files" in res:
+                    merged_files.extend(res["files"])
+            
+            response = {"files": merged_files}
             
             # Ensure the overall score calculation is accurate even if the LLM hallucinates the math slightly
             file_scores = [f.get("score", 0) for f in response.get("files", [])]
