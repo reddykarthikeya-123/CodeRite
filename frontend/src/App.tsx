@@ -640,7 +640,7 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
           type="file"
           className="hidden"
           ref={fileInputRef}
-          accept=".pdf,.docx,.txt,.md,.py,.js,.ts,.json,.html,.css,.xlsx,.csv,.xls,.pptx"
+          accept=".pdf,.docx,.txt,.md,.py,.js,.ts,.json,.html,.css,.xlsx,.csv,.xls,.pptx,.car,application/zip,application/octet-stream"
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
 
@@ -694,6 +694,7 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
                 { ext: 'DOCX', color: 'text-blue-600', bg: 'bg-blue-50' },
                 { ext: 'XLSX', color: 'text-green-600', bg: 'bg-green-50' },
                 { ext: 'PPTX', color: 'text-orange-600', bg: 'bg-orange-50' },
+                { ext: 'CAR', color: 'text-purple-600', bg: 'bg-purple-50' },
               ].map((format) => (
                 <motion.div
                   key={format.ext}

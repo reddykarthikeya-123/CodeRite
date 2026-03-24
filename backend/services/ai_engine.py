@@ -5,11 +5,12 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import json
 import os
 import logging
 import asyncio
+import tiktoken
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -48,6 +49,54 @@ class FixedCodeFile(BaseModel):
 
 class CodeAutoFixBatchResponse(BaseModel):
     fixed_files: List[FixedCodeFile] = Field(description="List of fixed code files")
+
+# Token counting helper function
+def count_tokens(text: str, model: str = "gpt-4") -> int:
+    """Count tokens in text using tiktoken."""
+    try:
+        enc = tiktoken.encoding_for_model(model)
+        return len(enc.encode(text))
+    except Exception:
+        # Fallback for non-OpenAI models - estimate 4 chars per token
+        return len(text) // 4
+
+# Token-based chunking function
+MAX_TOKENS = 6000  # Leave room for system prompt and response
+
+def chunk_text(text: str) -> List[str]:
+    """Split text into chunks based on token count."""
+    words = text.split()
+    chunks = []
+    current = []
+    
+    for word in words:
+        current.append(word)
+        if count_tokens(" ".join(current)) > MAX_TOKENS:
+            chunks.append(" ".join(current[:-1]))
+            current = [word]
+    
+    if current:
+        chunks.append(" ".join(current))
+    
+    return chunks
+
+# Retry wrapper for LLM calls
+async def call_with_retry(chain, messages, retries: int = 3):
+    """Call LLM with exponential backoff retry logic."""
+    delay = 2
+    
+    for attempt in range(retries):
+        try:
+            return await chain.ainvoke(messages)
+        except Exception as e:
+            logger.warning(f"LLM call failed (attempt {attempt + 1}/{retries}): {str(e)}")
+            if attempt == retries - 1:
+                logger.error(f"All {retries} retry attempts failed")
+                return {"error": str(e), "checklist": [], "suggestions": []}
+            await asyncio.sleep(delay)
+            delay *= 2  # Exponential backoff
+    
+    return {"error": "Unexpected retry loop exit", "checklist": [], "suggestions": []}
 
 class AIEngine:
     """Engine for interacting with various AI providers (OpenAI, Ollama, Gemini)."""
@@ -235,38 +284,85 @@ class AIEngine:
         
         # Check if the selected model supports vision (heuristic)
         supports_vision = any(v in self.model_name.lower() for v in ["gpt-4o", "gemini-1.5", "llava", "vision"])
+
+        # File-aware chunking for .car files
+        chunks = []
         
-        MAX_CHUNK_SIZE = 150000
-        text_chunks = [text[i:i + MAX_CHUNK_SIZE] for i in range(0, len(text), MAX_CHUNK_SIZE)] if text else [""]
+        # Check if text contains CAR metadata (indicates structured .car file)
+        if "[CAR_METADATA]" in text and file_type and file_type.lower().strip('.') == "car":
+            # Extract individual files from CAR archive
+            import re
+            car_match = re.search(r'\[CAR_METADATA\] total_size=(\d+), file_count=(\d+) \[/CAR_METADATA\]', text)
+            if car_match:
+                file_count = int(car_match.group(2))
+                logger.info(f"Processing .car file with {file_count} embedded files")
+            
+            # Split by file markers
+            file_pattern = r'\n--- File: (.+?) ---\n'
+            file_parts = re.split(file_pattern, text)
+            
+            # file_parts[0] is empty, then alternating filename/content
+            for i in range(1, len(file_parts), 2):
+                if i + 1 < len(file_parts):
+                    filename = file_parts[i]
+                    content = file_parts[i + 1]
+                    # Chunk each file by tokens
+                    file_chunks = chunk_text(content)
+                    for chunk in file_chunks:
+                        chunks.append({
+                            "filename": filename,
+                            "content": chunk
+                        })
+                logger.info(f"Chunked file: {filename} into {len(file_chunks)} parts")
+        else:
+            # Fallback for non-.car files - use token-based chunking
+            if text:
+                text_chunks = chunk_text(text)
+                chunks = [{"filename": "document", "content": chunk} for chunk in text_chunks]
         
-        async def process_chunk(chunk_index, chunk_text, semaphore):
+        logger.info(f"Total chunks to process: {len(chunks)}")
+        
+        # Configurable concurrency
+        MAX_CONCURRENCY = int(os.getenv("LLM_MAX_CONCURRENCY", "5"))
+        logger.info(f"Using concurrency limit: {MAX_CONCURRENCY}")
+
+        async def process_chunk(chunk_index, chunk_data, semaphore):
             async with semaphore:
-                # Build multimodal User message only if supported AND only for the first chunk to save tokens
+                logger.info(f"Processing chunk {chunk_index + 1}/{len(chunks)}: {chunk_data['filename']}")
+                
+                # Build user message with file context
+                user_content = f"""File: {chunk_data['filename']}
+
+Custom Instructions: {custom_instructions}
+
+Document Content (Part {chunk_index+1}):
+{chunk_data['content']}"""
+
+                # Add images only for first chunk if supported
                 if chunk_index == 0 and images and len(images) > 0 and supports_vision:
-                    user_content = [{"type": "text", "text": f"Custom Instructions: {custom_instructions}\n\nDocument Content (Part {chunk_index+1}):\n{chunk_text}"}]
+                    user_content_obj = [{"type": "text", "text": user_content}]
                     for img_b64 in images:
-                        user_content.append({
+                        user_content_obj.append({
                             "type": "image_url",
                             "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
                         })
+                    messages = [
+                        SystemMessage(content=system_msg_content),
+                        HumanMessage(content=user_content_obj)
+                    ]
                 else:
-                    user_content = f"Custom Instructions: {custom_instructions}\n\nDocument Content (Part {chunk_index+1}):\n{chunk_text}"
-                    
-                messages = [
-                    SystemMessage(content=system_msg_content),
-                    HumanMessage(content=user_content)
-                ]
-                
+                    messages = [
+                        SystemMessage(content=system_msg_content),
+                        HumanMessage(content=user_content)
+                    ]
+
                 chain = self.llm | self.parser
-                try:
-                    return await chain.ainvoke(messages)
-                except Exception as e:
-                    logger.error(f"Error processing document chunk {chunk_index}: {e}")
-                    return {"checklist": [], "suggestions": [], "error": str(e)}
+                # Use retry wrapper
+                return await call_with_retry(chain, messages)
 
         try:
-            semaphore = asyncio.Semaphore(3)
-            tasks = [process_chunk(i, chunk, semaphore) for i, chunk in enumerate(text_chunks)]
+            semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
+            tasks = [process_chunk(i, chunk, semaphore) for i, chunk in enumerate(chunks)]
             results = await asyncio.gather(*tasks)
             
             # Merge results

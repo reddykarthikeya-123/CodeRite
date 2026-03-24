@@ -139,7 +139,16 @@ async def parse_file(file: UploadFile) -> dict:
             text_content = await _parse_excel_from_bytes(content, filename)
             images = []
         elif filename.endswith(".car"):
-            text_content, images = await _parse_car_from_bytes(content)
+            # Returns structured data for better chunking
+            parsed_data = await _parse_car_from_bytes(content)
+            # Convert to text format for backward compatibility
+            text_parts = []
+            for file_info in parsed_data["files"]:
+                text_parts.append(f"\n--- File: {file_info['filename']} ---\n{file_info['content']}")
+            text_content = "\n".join(text_parts)
+            images = parsed_data["images"]
+            # Store structured data for AI engine to use
+            text_content = f"{text_content}\n\n[CAR_METADATA] total_size={parsed_data['total_size']}, file_count={parsed_data['file_count']} [/CAR_METADATA]"
 
         return {"text": text_content, "images": images}
     except Exception as e:
@@ -293,11 +302,15 @@ async def _parse_excel_from_bytes(content: bytes, filename: str) -> str:
     return text
 
 import zipfile
-async def _parse_car_from_bytes(content: bytes) -> Tuple[str, List[str]]:
-    """Recursively extract XML, XSL, WSDL, and properties from .car and .iar archives."""
-    text_parts = []
-    images = []
+async def _parse_car_from_bytes(content: bytes) -> dict:
+    """Recursively extract XML, XSL, WSDL, and properties from .car and .iar archives.
     
+    Returns structured data with individual files preserved for better chunking.
+    """
+    files = []
+    images = []
+    total_size = 0
+
     def process_zip_content(zip_bytes, prefix=""):
         try:
             with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
@@ -305,26 +318,38 @@ async def _parse_car_from_bytes(content: bytes) -> Tuple[str, List[str]]:
                     if info.is_dir():
                         continue
                     filename = info.filename.lower()
-                    
+
                     if filename.endswith(('.xml', '.xsl', '.wsdl', '.properties', '.jpr', '.jca', '.xqy')):
                         file_data = z.read(info.filename)
                         try:
                             decoded = file_data.decode('utf-8')
                         except UnicodeDecodeError:
                             decoded = file_data.decode('latin-1', errors='ignore')
-                        
-                        file_header = f"\n--- {prefix}{info.filename} ---\n"
-                        text_parts.append(file_header + decoded + "\n")
-                    
+
+                        # Store each file separately with its path
+                        files.append({
+                            "filename": f"{prefix}{info.filename}",
+                            "content": decoded
+                        })
+                        total_size += len(decoded)
+
                     elif filename.endswith('.iar'):
                         file_data = z.read(info.filename)
-                        text_parts.append(f"\n--- Entering nested archive: {prefix}{info.filename} ---\n")
                         process_zip_content(file_data, prefix + info.filename + " -> ")
-                        
+
         except Exception as e:
-            text_parts.append(f"\n[Error extracting archive: {str(e)}]\n")
+            logger.error(f"Error extracting archive: {str(e)}")
+            files.append({
+                "filename": "ERROR",
+                "content": f"[Error extracting archive: {str(e)}]"
+            })
 
     process_zip_content(content)
-    text = "".join(text_parts)
-        
-    return text, images
+    
+    # Add metadata
+    return {
+        "files": files,
+        "total_size": total_size,
+        "file_count": len(files),
+        "images": images
+    }
