@@ -186,7 +186,7 @@ function App() {
   };
 
   return (
-    <div className={`flex flex-col h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9] text-slate-900 font-sans selection:bg-[#1E40AF]/10 selection:text-[#1E40AF] ${
+    <div className={`flex flex-col min-h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9] text-slate-900 font-sans selection:bg-[#1E40AF]/10 selection:text-[#1E40AF] ${
       !currentFile && !uploading && !docReviewResult && !codeReviewResult ? 'home-page-no-scroll' : ''
     }`}>
       {/* Settings Modal */}
@@ -220,7 +220,7 @@ function App() {
       </header>
 
       <main className={`max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12 flex-1 flex flex-col ${
-        !currentFile && !uploading && !docReviewResult && !codeReviewResult ? 'justify-center' : 'justify-start overflow-y-auto'
+        !currentFile && !uploading && !docReviewResult && !codeReviewResult ? 'justify-center' : 'justify-start'
       }`}>
         <AnimatePresence mode="wait">
           {!currentFile && !uploading && !docReviewResult && !codeReviewResult && (
