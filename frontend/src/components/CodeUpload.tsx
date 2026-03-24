@@ -185,6 +185,7 @@ export const CodeUpload: React.FC<CodeUploadProps> = ({ onCodeProcessed }) => {
                                     ref={fileInputRef}
                                     type="file"
                                     multiple
+                                    accept={codeExtensions.join(',')}
                                     className="hidden"
                                     onChange={handleFileInput}
                                 />

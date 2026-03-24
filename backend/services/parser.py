@@ -312,7 +312,9 @@ async def _parse_car_from_bytes(content: bytes) -> Tuple[str, List[str]]:
                             decoded = file_data.decode('utf-8')
                         except UnicodeDecodeError:
                             decoded = file_data.decode('latin-1', errors='ignore')
-                        text_parts.append(f"\n--- {prefix}{info.filename} ---\n{decoded}\n")
+                        
+                        file_header = f"\n--- {prefix}{info.filename} ---\n"
+                        text_parts.append(file_header + decoded + "\n")
                     
                     elif filename.endswith('.iar'):
                         file_data = z.read(info.filename)
@@ -324,10 +326,5 @@ async def _parse_car_from_bytes(content: bytes) -> Tuple[str, List[str]]:
 
     process_zip_content(content)
     text = "".join(text_parts)
-    
-    # Cap string length at 250,000 characters to prevent LLM connection timeouts / token limits
-    if len(text) > 250000:
-        logger.warning(f"Car file extraction exceeded 250k chars. Truncating.")
-        text = text[:250000] + "\n\n...[CONTENT TRUNCATED DUE TO MAXIMUM TOKEN LIMITS]..."
         
     return text, images

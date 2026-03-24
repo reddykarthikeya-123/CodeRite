@@ -115,7 +115,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
                         type="file"
                         className="hidden"
                         ref={fileInputRef}
-                        accept=".pdf,.docx,.txt,.md,.py,.js,.ts,.json,.html,.css,.xlsx,.csv,.xls,.pptx"
+                        accept=".pdf,.docx,.txt,.md,.py,.js,.ts,.json,.html,.css,.xlsx,.csv,.xls,.pptx,.car"
                         onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
                     />
 
