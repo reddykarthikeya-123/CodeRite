@@ -19,12 +19,21 @@ export interface SuggestionItem {
   text: string;
 }
 
+export interface PaginationMetadata {
+  enabled: boolean;
+  format: string | null;
+  total_pages: number | null;
+  provider: string;
+  warning: string | null;
+}
+
 export interface ReviewResponse {
   score: number;
   checklist: ChecklistItem[];
   suggestions: SuggestionItem[];
   rewritten_content?: string;
   filename?: string;
+  pagination_warning?: string;
 }
 
 export interface CodeFileReview {
@@ -46,6 +55,7 @@ export interface AnalyzeDocumentRequest {
   images: string[];
   file_type?: string;
   enabled_checks?: string[];
+  pagination_metadata?: PaginationMetadata;
 }
 
 export interface AnalyzeCodeRequest {

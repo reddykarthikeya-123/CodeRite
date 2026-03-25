@@ -95,6 +95,33 @@ async def startup():
         logger.info(f"✅ Poppler utils found at: {poppler_path}")
     else:
         logger.warning("❌ Poppler utils not found! PDF to Image conversion will fail. (Hint: sudo apt install poppler-utils)")
+    configured_soffice = os.getenv("SOFFICE_PATH", "").strip()
+    soffice_path = configured_soffice if configured_soffice else shutil.which("soffice")
+
+    # Windows users often have LibreOffice installed outside PATH.
+    if not soffice_path and platform.system() == "Windows":
+        windows_candidates = [
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        ]
+        for candidate in windows_candidates:
+            if os.path.exists(candidate):
+                soffice_path = candidate
+                break
+
+    if soffice_path and os.path.exists(soffice_path):
+        logger.info(f"✅ LibreOffice soffice found at: {soffice_path}")
+    else:
+        if platform.system() == "Windows":
+            logger.warning(
+                "❌ LibreOffice soffice not found! DOCX page-accurate pagination will be disabled. "
+                "(Hint: install LibreOffice or set SOFFICE_PATH to C:\\Program Files\\LibreOffice\\program\\soffice.exe)"
+            )
+        else:
+            logger.warning(
+                "❌ LibreOffice soffice not found! DOCX page-accurate pagination will be disabled. "
+                "(Hint: sudo apt install libreoffice libreoffice-writer)"
+            )
     logger.info("------------------------------------")
 
 # Pydantic Models for Requests
@@ -111,6 +138,7 @@ class AnalysisRequest(BaseModel):
     document_category: str
     file_type: Optional[str] = None
     enabled_checks: Optional[List[str]] = None
+    pagination_metadata: Optional[dict] = None
 
 class CodeFile(BaseModel):
     filename: str
@@ -327,8 +355,10 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         parsed_data = await parse_file(file)
         return {
             "filename": file.filename,
+            "text": parsed_data["text"],
             "content": parsed_data["text"],
-            "images": parsed_data.get("images", [])
+            "images": parsed_data.get("images", []),
+            "pagination_metadata": parsed_data.get("pagination_metadata")
         }
     except HTTPException:
         raise
@@ -367,7 +397,8 @@ async def analyze_document(request: Request, analysis_request: AnalysisRequest, 
             analysis_request.custom_instructions,
             analysis_request.document_category,
             analysis_request.file_type,
-            analysis_request.enabled_checks
+            analysis_request.enabled_checks,
+            analysis_request.pagination_metadata
         )
 
         return review_result

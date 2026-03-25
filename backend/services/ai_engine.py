@@ -158,7 +158,16 @@ class AIEngine:
             logger.error(f"Connection test failed: {e}")
             raise Exception(f"{str(e)}")
 
-    async def analyze_document(self, text: str, images: List[str] = None, custom_instructions: str = "", document_category: str = None, file_type: str = None, enabled_checks: List[str] = None) -> dict:
+    async def analyze_document(
+        self,
+        text: str,
+        images: List[str] = None,
+        custom_instructions: str = "",
+        document_category: str = None,
+        file_type: str = None,
+        enabled_checks: List[str] = None,
+        pagination_metadata: Optional[Dict[str, Any]] = None
+    ) -> dict:
         """Analyzes a document using the AI model and a target checklist.
 
         Args:
@@ -168,6 +177,7 @@ class AIEngine:
             document_category: The category of the document for checklist lookup.
             file_type: The extension of the original file.
             enabled_checks: List of enabled check IDs (format: "index-checklist_text") to filter checklist items.
+            pagination_metadata: Optional pagination capabilities from parser/upload step.
 
         Returns:
             A dictionary containing the review results.
@@ -205,14 +215,25 @@ class AIEngine:
         reference_format = "Section"  # Default
         reference_enabled = True  # Whether to include location references at all
 
+        pagination_enabled = False
+        if pagination_metadata and isinstance(pagination_metadata, dict):
+            pagination_enabled = bool(pagination_metadata.get("enabled", False))
+
         if file_type:
             file_type = file_type.lower().strip('.')
 
-            # Text/code files and DOCX: disable location references
-            # DOCX files don't have reliable page breaks (pagination is viewer-dependent)
-            if file_type in ["txt", "md", "py", "js", "ts", "json", "html", "css", "docx", "doc"]:
+            # Text/code files: disable location references.
+            if file_type in ["txt", "md", "py", "js", "ts", "json", "html", "css"]:
                 reference_format = None
                 reference_enabled = False
+            elif file_type in ["docx", "doc"]:
+                # DOCX references are only allowed when parser verified pagination.
+                if pagination_enabled:
+                    reference_format = "Page"
+                    reference_enabled = True
+                else:
+                    reference_format = None
+                    reference_enabled = False
             elif file_type in ["pdf", "pptx", "ppt"]:
                 reference_format = "Page" if file_type in ["pdf"] else "Slide"
             elif file_type in ["xlsx", "xls", "csv"]:
@@ -221,8 +242,8 @@ class AIEngine:
         # Extract total page count from document text for validation
         import re
         total_pages = 0
-        if file_type and file_type.lower().strip('.') == "pdf":
-            # PDF files have page markers in the format "--- Page X Text ---" or "--- Page X Tables ---"
+        if file_type and file_type.lower().strip('.') in ["pdf", "docx", "doc"] and reference_format == "Page":
+            # Page-based files have page markers in the format "--- Page X Text ---" or "--- Page X Tables ---"
             page_matches = re.findall(r'--- Page (\d+) (?:Text|Tables) ---', text)
             if page_matches:
                 total_pages = max([int(p) for p in page_matches], default=0)
@@ -233,6 +254,15 @@ class AIEngine:
         elif file_type and file_type.lower().strip('.') in ["xlsx", "xls", "csv"]:
             sheet_matches = re.findall(r'--- Excel Sheet: (.+?) ---', text)
             total_pages = len(sheet_matches)  # Count of sheets
+
+        # Safety: if references are enabled but markers are missing, disable references
+        # to prevent fabricated/incorrect location numbers.
+        if reference_enabled and reference_format in ["Page", "Slide"] and total_pages == 0:
+            logger.warning(
+                f"Disabling {reference_format.lower()} references due to missing markers in parsed text."
+            )
+            reference_enabled = False
+            reference_format = None
 
         # Build conditional reference instructions based on file type
         if reference_enabled and reference_format:

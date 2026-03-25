@@ -173,6 +173,16 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
 
     return (
         <div className="space-y-8">
+            {result.pagination_warning && (
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 text-sm font-medium"
+                >
+                    {result.pagination_warning}
+                </motion.div>
+            )}
+
             {/* Score Card */}
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -417,4 +427,3 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
         </div>
     );
 };
-

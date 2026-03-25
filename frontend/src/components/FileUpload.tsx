@@ -1,10 +1,18 @@
 import { useRef, useState, useEffect } from 'react';
 import { Upload, FileText, AlertCircle, ListChecks } from 'lucide-react';
-import { uploadFile, fetchChecklistCategories } from '../api';
+import { uploadFile, fetchChecklistCategories, type PaginationMetadata } from '../api';
 import { motion } from 'framer-motion';
 
 interface FileUploadProps {
-    onFileProcessed: (content: string, filename: string, category: string, images?: string[], fileType?: string) => void;
+    onFileProcessed: (
+        content: string,
+        filename: string,
+        category: string,
+        images?: string[],
+        fileType?: string,
+        checks?: string[],
+        paginationMetadata?: PaginationMetadata
+    ) => void;
 }
 
 export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
@@ -34,7 +42,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcessed }) => {
         try {
             const fileType = file.name.split('.').pop()?.toLowerCase() || '';
             const data = await uploadFile(file);
-            onFileProcessed(data.text, data.filename || file.name, selectedCategory, data.images, fileType);
+            onFileProcessed(
+                data.text,
+                data.filename || file.name,
+                selectedCategory,
+                data.images,
+                fileType,
+                undefined,
+                data.pagination_metadata
+            );
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
             console.error('File upload error:', errorMessage);

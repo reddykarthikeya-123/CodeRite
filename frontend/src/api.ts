@@ -8,7 +8,8 @@ import type {
   AutoFixResponse,
   BatchAutoFixRequest,
   BatchAutoFixResponse,
-  ChecklistItem
+  ChecklistItem,
+  PaginationMetadata
 } from "./api/types";
 
 // Re-export types for convenience
@@ -22,7 +23,8 @@ export type {
   AutoFixResponse,
   BatchAutoFixRequest,
   BatchAutoFixResponse,
-  ChecklistItem
+  ChecklistItem,
+  PaginationMetadata
 };
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
@@ -115,7 +117,9 @@ export const testConnection = async (id: number): Promise<{ success: boolean; me
   return handleResponse<{ success: boolean; message: string }>(response);
 };
 
-export const uploadFile = async (file: File): Promise<{ text: string; images: string[]; filename?: string }> => {
+export const uploadFile = async (
+  file: File
+): Promise<{ text: string; images: string[]; filename?: string; pagination_metadata?: PaginationMetadata }> => {
   const formData = new FormData();
   formData.append("file", file);
 
@@ -129,7 +133,8 @@ export const uploadFile = async (file: File): Promise<{ text: string; images: st
   return {
     text: (data.text as string) || (data.content as string) || '',
     images: (data.images as string[]) || [],
-    filename: data.filename as string | undefined
+    filename: data.filename as string | undefined,
+    pagination_metadata: data.pagination_metadata as PaginationMetadata | undefined
   };
 };
 
@@ -151,7 +156,8 @@ export const analyzeDocument = async (
   documentCategory?: string,
   images?: string[],
   fileType?: string,
-  enabledChecks?: string[]
+  enabledChecks?: string[],
+  paginationMetadata?: PaginationMetadata
 ): Promise<ReviewResponse> => {
   const payload: AnalyzeDocumentRequest = {
     text,
@@ -161,6 +167,7 @@ export const analyzeDocument = async (
   if (documentCategory) payload.document_category = documentCategory;
   if (fileType) payload.file_type = fileType;
   if (enabledChecks) payload.enabled_checks = enabledChecks;
+  if (paginationMetadata) payload.pagination_metadata = paginationMetadata;
 
   const response = await fetchWithTimeout(`${API_BASE_URL}/analyze`, {
     method: "POST",

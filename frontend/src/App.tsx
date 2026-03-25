@@ -4,7 +4,7 @@ import { ReviewResult } from './components/ReviewResult';
 import { CodeResult, type CodeAnalysisResponse } from './components/CodeResult';
 import { Modal } from './components/Modal';
 import { ChecklistFilterModal } from './components/ChecklistFilterModal';
-import { analyzeDocument, analyzeCode, fetchChecklistCategories, fetchChecklistItems, type ReviewResponse } from './api';
+import { analyzeDocument, analyzeCode, fetchChecklistCategories, fetchChecklistItems, type ReviewResponse, type PaginationMetadata } from './api';
 import { Loader2, Settings, ArrowLeft, ListChecks, Upload, FileText, UploadCloud, FileCode2, Code2, Trash2, X, AlertTriangle, FileUp, HelpCircle, Lightbulb } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -100,15 +100,27 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleFileProcessed = async (content: string, filename: string, category: string, images?: string[], fileType?: string, checks?: string[]) => {
+  const handleFileProcessed = async (
+    content: string,
+    filename: string,
+    category: string,
+    images?: string[],
+    fileType?: string,
+    checks?: string[],
+    paginationMetadata?: PaginationMetadata
+  ) => {
     setCurrentFile({ content, filename });
     setDocReviewResult(null);
     setCodeReviewResult(null);
     setUploading(true);
 
     try {
-      const result = await analyzeDocument(content, "", category, images, fileType, checks);
-      setDocReviewResult({ ...result, filename });
+      const result = await analyzeDocument(content, "", category, images, fileType, checks, paginationMetadata);
+      const isWordFile = fileType === 'docx' || fileType === 'doc';
+      const paginationWarning = isWordFile && paginationMetadata && !paginationMetadata.enabled
+        ? (paginationMetadata.warning || "Page references disabled for this file because Word-to-PDF pagination failed.")
+        : undefined;
+      setDocReviewResult({ ...result, filename, pagination_warning: paginationWarning });
     } catch (err) {
       console.error('Document analysis error:', err);
       setUploadError("Analysis failed. Please check the backend and configuration.");
@@ -160,7 +172,15 @@ function App() {
       uploadFile(file)
         .then(data => {
           console.log('[handleChecklistApply] File uploaded, sending to analyze with', selectedChecks.length, 'checks');
-          handleFileProcessed(data.text, data.filename || file.name, category, data.images, fileType, selectedChecks);
+          handleFileProcessed(
+            data.text,
+            data.filename || file.name,
+            category,
+            data.images,
+            fileType,
+            selectedChecks,
+            data.pagination_metadata
+          );
         })
         .catch(err => {
           console.error('Upload error:', err);
@@ -565,7 +585,15 @@ const FileUploadSelector: React.FC<FileUploadSelectorProps> = ({
 
 // FileUploadDropzone Component - Right pane document upload
 interface FileUploadDropzoneProps {
-  onFileProcessed: (content: string, filename: string, category: string, images?: string[], fileType?: string, checks?: string[]) => void;
+  onFileProcessed: (
+    content: string,
+    filename: string,
+    category: string,
+    images?: string[],
+    fileType?: string,
+    checks?: string[],
+    paginationMetadata?: PaginationMetadata
+  ) => void;
   onFileUpload: (file: File, category: string) => void;
   uploading: boolean;
   setUploading: (uploading: boolean) => void;

@@ -21,9 +21,15 @@ Run the following on your Linux server to prepare the environment:
 sudo apt update
 sudo apt install -y python3-pip python3-venv git nginx
 sudo apt install -y tesseract-ocr poppler-utils
+sudo apt install -y libreoffice libreoffice-writer fonts-liberation fonts-dejavu-core
 ```
 
-*Note: If `tesseract-ocr` and `poppler-utils` are not installed, the application will not crash, but it will be physically unable to read images embedded inside uploaded documents.*
+Optional (for closer Microsoft Office layout parity in converted DOCX pagination):
+```bash
+sudo apt install -y ttf-mscorefonts-installer
+```
+
+*Note: If `tesseract-ocr` and `poppler-utils` are not installed, the application will not crash, but it will be physically unable to read images embedded inside uploaded documents. If `libreoffice` is missing, DOCX page-number references will be disabled.*
 
 ---
 
@@ -60,6 +66,15 @@ DATABASE_URL="postgresql+asyncpg://<username>:<password>@<db-host>:5432/CodeRite
 
 # Point this to your GPU server running Ollama
 OLLAMA_BASE_URL="http://<ollama-server-ip>:11434"
+
+# LibreOffice binary used for DOCX -> PDF conversion
+SOFFICE_PATH="/usr/bin/soffice"
+
+# Timeout (seconds) for DOCX -> PDF conversion
+DOCX_CONVERT_TIMEOUT_SEC=90
+
+# If true, DOCX analysis fails when pagination conversion fails
+DOCX_PAGINATION_REQUIRED=false
 ```
 
 ---

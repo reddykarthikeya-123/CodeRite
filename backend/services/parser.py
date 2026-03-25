@@ -4,7 +4,6 @@ Supports PDF, DOCX, PPTX, Excel, and plain text files. Uses OCR for images
 embedded in documents when necessary.
 """
 from fastapi import UploadFile, HTTPException
-from pypdf import PdfReader
 import pdfplumber
 from docx import Document
 from pptx import Presentation
@@ -16,7 +15,14 @@ from pdf2image import convert_from_bytes
 import os
 import base64
 import logging
-from typing import Tuple, List
+import re
+import asyncio
+import shutil
+import tempfile
+import subprocess
+import platform
+from pathlib import Path
+from typing import Tuple, List, Dict, Any
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -55,6 +61,127 @@ ALLOWED_MIME_TYPES = {
     "application/octet-stream",
     "application/x-zip-compressed"
 }
+
+
+def _is_truthy_env(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _docx_pagination_required() -> bool:
+    return _is_truthy_env(os.getenv("DOCX_PAGINATION_REQUIRED", "false"))
+
+
+def _default_pagination_metadata() -> Dict[str, Any]:
+    return {
+        "enabled": False,
+        "format": None,
+        "total_pages": None,
+        "provider": "none",
+        "warning": None
+    }
+
+
+def _build_pagination_metadata(
+    enabled: bool,
+    page_format: str | None,
+    total_pages: int | None,
+    provider: str,
+    warning: str | None = None
+) -> Dict[str, Any]:
+    return {
+        "enabled": enabled,
+        "format": page_format,
+        "total_pages": total_pages,
+        "provider": provider,
+        "warning": warning
+    }
+
+
+def _extract_total_pages(text: str) -> int:
+    matches = re.findall(r'--- Page (\d+) (?:Text|Tables) ---', text)
+    if not matches:
+        return 0
+    return max(int(page) for page in matches)
+
+
+def _resolve_soffice_path() -> str:
+    configured_path = os.getenv("SOFFICE_PATH", "").strip()
+    if configured_path:
+        if os.path.exists(configured_path):
+            return configured_path
+        raise RuntimeError(f"SOFFICE_PATH is set but not found: {configured_path}")
+
+    discovered_path = shutil.which("soffice")
+    if discovered_path:
+        return discovered_path
+
+    if platform.system() == "Windows":
+        candidate_paths = [
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        ]
+        for candidate in candidate_paths:
+            if os.path.exists(candidate):
+                return candidate
+
+    raise RuntimeError(
+        "LibreOffice 'soffice' binary not found. Install LibreOffice and set SOFFICE_PATH if needed."
+    )
+
+
+async def _convert_docx_to_pdf_with_libreoffice(content: bytes) -> bytes:
+    """Converts DOCX bytes to PDF bytes using headless LibreOffice."""
+    soffice_path = _resolve_soffice_path()
+    timeout_sec = int(os.getenv("DOCX_CONVERT_TIMEOUT_SEC", "90"))
+
+    with tempfile.TemporaryDirectory(prefix="docx_convert_") as tmpdir:
+        input_path = os.path.join(tmpdir, "input.docx")
+        output_dir = os.path.join(tmpdir, "out")
+        profile_dir = os.path.join(tmpdir, "profile")
+
+        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(profile_dir, exist_ok=True)
+
+        with open(input_path, "wb") as f:
+            f.write(content)
+
+        # Isolate LO profile per request to avoid lock/contention issues.
+        profile_uri = Path(profile_dir).resolve().as_uri()
+        command = [
+            soffice_path,
+            "--headless",
+            "--nologo",
+            "--nodefault",
+            "--nolockcheck",
+            "--norestore",
+            f"-env:UserInstallation={profile_uri}",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            output_dir,
+            input_path,
+        ]
+
+        completed = await asyncio.to_thread(
+            subprocess.run,
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_sec,
+        )
+
+        if completed.returncode != 0:
+            stderr = (completed.stderr or completed.stdout or "Unknown conversion error").strip()
+            raise RuntimeError(f"LibreOffice conversion failed with code {completed.returncode}: {stderr}")
+
+        output_pdf_path = os.path.join(output_dir, "input.pdf")
+        if not os.path.exists(output_pdf_path):
+            stderr = (completed.stderr or completed.stdout or "No output PDF generated").strip()
+            raise RuntimeError(f"LibreOffice conversion produced no PDF output: {stderr}")
+
+        with open(output_pdf_path, "rb") as pdf_file:
+            return pdf_file.read()
 
 def sanitize_filename(filename: str) -> str:
     """Sanitize the filename by taking only the base name.
@@ -124,12 +251,21 @@ async def parse_file(file: UploadFile) -> dict:
 
     images = []
     text_content = ""
+    pagination_metadata = _default_pagination_metadata()
 
     try:
         if filename.endswith(".pdf"):
             text_content, images = await _parse_pdf_from_bytes(content)
+            total_pages = _extract_total_pages(text_content)
+            pagination_metadata = _build_pagination_metadata(
+                enabled=total_pages > 0,
+                page_format="Page" if total_pages > 0 else None,
+                total_pages=total_pages if total_pages > 0 else None,
+                provider="native_pdf",
+                warning=None
+            )
         elif filename.endswith(".docx"):
-            text_content, images = await _parse_docx_from_bytes(content)
+            text_content, images, pagination_metadata = await _parse_docx_from_bytes(content)
         elif filename.endswith(".pptx"):
             text_content, images = await _parse_pptx_from_bytes(content)
         elif filename.endswith((".txt", ".md", ".py", ".js", ".ts", ".json", ".html", ".css")):
@@ -150,7 +286,7 @@ async def parse_file(file: UploadFile) -> dict:
             # Store structured data for AI engine to use
             text_content = f"{text_content}\n\n[CAR_METADATA] total_size={parsed_data['total_size']}, file_count={parsed_data['file_count']} [/CAR_METADATA]"
 
-        return {"text": text_content, "images": images}
+        return {"text": text_content, "images": images, "pagination_metadata": pagination_metadata}
     except Exception as e:
         logger.error(f"Error parsing file '{filename}': {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error parsing file. Please check the file format and try again.")
@@ -203,20 +339,47 @@ async def _parse_pdf_from_bytes(content: bytes) -> Tuple[str, List[str]]:
         logger.warning(f"OCR/Vision warning on PDF: {e}")
 
     return text, base64_images
-async def _parse_docx_from_bytes(content: bytes) -> Tuple[str, List[str]]:
+
+
+async def _parse_docx_from_bytes(content: bytes) -> Tuple[str, List[str], Dict[str, Any]]:
     """Extracts text and images from a DOCX provided as bytes.
 
     Args:
         content: The raw DOCX file content.
 
     Returns:
-        A tuple of (extracted_text, list_of_base64_images).
+        A tuple of (extracted_text, list_of_base64_images, pagination_metadata).
     """
+    conversion_error: str | None = None
+
+    # Preferred path: convert DOCX to PDF and reuse PDF parser for page-accurate markers.
+    try:
+        converted_pdf_bytes = await _convert_docx_to_pdf_with_libreoffice(content)
+        text, base64_images = await _parse_pdf_from_bytes(converted_pdf_bytes)
+        total_pages = _extract_total_pages(text)
+        if total_pages <= 0:
+            conversion_error = "Converted PDF did not contain usable page markers."
+            raise RuntimeError(conversion_error)
+
+        pagination_metadata = _build_pagination_metadata(
+            enabled=True,
+            page_format="Page",
+            total_pages=total_pages,
+            provider="libreoffice_pdf",
+            warning=None,
+        )
+        return text, base64_images, pagination_metadata
+    except Exception as conversion_exception:
+        conversion_error = str(conversion_exception)
+        logger.warning(f"DOCX pagination conversion failed. Falling back to text extraction: {conversion_error}")
+        if _docx_pagination_required():
+            raise RuntimeError(
+                f"DOCX pagination is required but DOCX->PDF conversion failed: {conversion_error}"
+            ) from conversion_exception
+
+    # Fallback path: extract text directly without page references.
     doc = Document(io.BytesIO(content))
     text = ""
-    # DOCX files don't have reliable page breaks in their structure
-    # (pagination is determined at render time by the viewer)
-    # So we extract text without artificial page markers
     for para in doc.paragraphs:
         if para.text.strip():
             text += para.text + "\n"
@@ -233,13 +396,27 @@ async def _parse_docx_from_bytes(content: bytes) -> Tuple[str, List[str]]:
                 img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
                 base64_images.append(img_b64)
 
-                ocr_text = pytesseract.image_to_string(img)
+                ocr_text = await asyncio.to_thread(pytesseract.image_to_string, img)
                 if ocr_text.strip():
                     text += f"\n--- Embedded Image OCR ---\n{ocr_text}\n"
     except Exception as e:
         logger.warning(f"OCR/Vision warning on Docx: {e}")
 
-    return text, base64_images
+    warning = (
+        "Page references disabled for this file because Word-to-PDF pagination failed."
+        if conversion_error else
+        "Page references disabled for this file."
+    )
+    pagination_metadata = _build_pagination_metadata(
+        enabled=False,
+        page_format=None,
+        total_pages=None,
+        provider="none",
+        warning=warning
+    )
+    return text, base64_images, pagination_metadata
+
+
 async def _parse_pptx_from_bytes(content: bytes) -> Tuple[str, List[str]]:
     """Extracts text and images from a PPTX provided as bytes.
 
