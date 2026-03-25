@@ -21,6 +21,7 @@ import shutil
 import tempfile
 import subprocess
 import platform
+import time
 from pathlib import Path
 from typing import Tuple, List, Dict, Any
 from config.logging_config import get_logger
@@ -133,6 +134,10 @@ async def _convert_docx_to_pdf_with_libreoffice(content: bytes) -> bytes:
     """Converts DOCX bytes to PDF bytes using headless LibreOffice."""
     soffice_path = _resolve_soffice_path()
     timeout_sec = int(os.getenv("DOCX_CONVERT_TIMEOUT_SEC", "90"))
+    start_time = time.perf_counter()
+    logger.info(
+        f"DOCX->PDF conversion started via LibreOffice. soffice='{soffice_path}', timeout={timeout_sec}s"
+    )
 
     with tempfile.TemporaryDirectory(prefix="docx_convert_") as tmpdir:
         input_path = os.path.join(tmpdir, "input.docx")
@@ -173,15 +178,24 @@ async def _convert_docx_to_pdf_with_libreoffice(content: bytes) -> bytes:
 
         if completed.returncode != 0:
             stderr = (completed.stderr or completed.stdout or "Unknown conversion error").strip()
+            logger.error(f"DOCX->PDF conversion failed. LibreOffice stderr/stdout: {stderr}")
             raise RuntimeError(f"LibreOffice conversion failed with code {completed.returncode}: {stderr}")
 
         output_pdf_path = os.path.join(output_dir, "input.pdf")
         if not os.path.exists(output_pdf_path):
             stderr = (completed.stderr or completed.stdout or "No output PDF generated").strip()
+            logger.error(f"DOCX->PDF conversion produced no output PDF. LibreOffice stderr/stdout: {stderr}")
             raise RuntimeError(f"LibreOffice conversion produced no PDF output: {stderr}")
 
         with open(output_pdf_path, "rb") as pdf_file:
-            return pdf_file.read()
+            pdf_bytes = pdf_file.read()
+
+        elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+        logger.info(
+            f"DOCX->PDF conversion succeeded via LibreOffice in {elapsed_ms}ms. "
+            f"output_size={len(pdf_bytes)} bytes"
+        )
+        return pdf_bytes
 
 def sanitize_filename(filename: str) -> str:
     """Sanitize the filename by taking only the base name.
@@ -266,6 +280,13 @@ async def parse_file(file: UploadFile) -> dict:
             )
         elif filename.endswith(".docx"):
             text_content, images, pagination_metadata = await _parse_docx_from_bytes(content)
+            logger.info(
+                "DOCX parse completed. "
+                f"pagination_enabled={pagination_metadata.get('enabled')} "
+                f"provider={pagination_metadata.get('provider')} "
+                f"total_pages={pagination_metadata.get('total_pages')} "
+                f"warning={pagination_metadata.get('warning')}"
+            )
         elif filename.endswith(".pptx"):
             text_content, images = await _parse_pptx_from_bytes(content)
         elif filename.endswith((".txt", ".md", ".py", ".js", ".ts", ".json", ".html", ".css")):
@@ -353,6 +374,7 @@ async def _parse_docx_from_bytes(content: bytes) -> Tuple[str, List[str], Dict[s
     conversion_error: str | None = None
 
     # Preferred path: convert DOCX to PDF and reuse PDF parser for page-accurate markers.
+    logger.info("DOCX pagination: attempting LibreOffice conversion for page-accurate references.")
     try:
         converted_pdf_bytes = await _convert_docx_to_pdf_with_libreoffice(content)
         text, base64_images = await _parse_pdf_from_bytes(converted_pdf_bytes)
@@ -367,6 +389,10 @@ async def _parse_docx_from_bytes(content: bytes) -> Tuple[str, List[str], Dict[s
             total_pages=total_pages,
             provider="libreoffice_pdf",
             warning=None,
+        )
+        logger.info(
+            f"DOCX pagination enabled via LibreOffice PDF conversion. total_pages={total_pages}, "
+            f"images_extracted={len(base64_images)}"
         )
         return text, base64_images, pagination_metadata
     except Exception as conversion_exception:
@@ -413,6 +439,10 @@ async def _parse_docx_from_bytes(content: bytes) -> Tuple[str, List[str], Dict[s
         total_pages=None,
         provider="none",
         warning=warning
+    )
+    logger.info(
+        "DOCX pagination disabled; using fallback text extraction without page references. "
+        f"fallback_images_extracted={len(base64_images)}"
     )
     return text, base64_images, pagination_metadata
 

@@ -264,6 +264,21 @@ class AIEngine:
             reference_enabled = False
             reference_format = None
 
+        if file_type in ["docx", "doc"]:
+            pagination_provider = (
+                pagination_metadata.get("provider")
+                if isinstance(pagination_metadata, dict)
+                else None
+            )
+            logger.info(
+                "DOCX analysis reference configuration: "
+                f"pagination_enabled={pagination_enabled}, "
+                f"reference_enabled={reference_enabled}, "
+                f"reference_format={reference_format}, "
+                f"total_pages={total_pages}, "
+                f"provider={pagination_provider}"
+            )
+
         # Build conditional reference instructions based on file type
         if reference_enabled and reference_format:
             if reference_format == "Sheet":
