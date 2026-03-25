@@ -10,11 +10,12 @@ import json
 import os
 import logging
 import asyncio
+import math
 import tiktoken
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
-DETERMINISTIC_PROFILE_VERSION = "det_profile_v1"
+DETERMINISTIC_PROFILE_VERSION = "det_profile_v2"
 
 
 def _is_truthy_env(value: str) -> bool:
@@ -35,6 +36,14 @@ def _safe_int_env(name: str, default: int) -> int:
         return int(raw)
     except (TypeError, ValueError):
         return default
+
+
+def _safe_csv_env(name: str, default: List[str]) -> List[str]:
+    raw = os.getenv(name, "")
+    if not raw.strip():
+        return default
+    values = [value.strip().lower() for value in raw.split(",")]
+    return [value for value in values if value]
 
 class ChecklistItem(BaseModel):
     section: str = Field(description="The section this item belongs to")
@@ -84,15 +93,18 @@ def count_tokens(text: str, model: str = "gpt-4") -> int:
 # Token-based chunking function
 MAX_TOKENS = 6000  # Leave room for system prompt and response
 
-def chunk_text(text: str) -> List[str]:
+def chunk_text(text: str, max_tokens: int = MAX_TOKENS) -> List[str]:
     """Split text into chunks based on token count."""
+    if max_tokens <= 0:
+        max_tokens = MAX_TOKENS
+
     words = text.split()
     chunks = []
     current = []
     
     for word in words:
         current.append(word)
-        if count_tokens(" ".join(current)) > MAX_TOKENS:
+        if count_tokens(" ".join(current)) > max_tokens:
             chunks.append(" ".join(current[:-1]))
             current = [word]
     
@@ -122,6 +134,7 @@ async def call_with_retry(chain, messages, retries: int = 3):
 class AIEngine:
     """Engine for interacting with various AI providers (OpenAI, Ollama, Gemini)."""
     _ollama_seed_warning_logged = False
+    _vision_disabled_warning_logged = False
 
     def __init__(self, provider: str = "ollama", model_name: str = "llama3", api_key: str = None):
         """Initializes the AI Engine with the specified provider and model.
@@ -140,8 +153,49 @@ class AIEngine:
         self.top_p = _safe_float_env("LLM_TOP_P", 1.0)
         self.seed = _safe_int_env("LLM_SEED", 42)
         self.top_k = _safe_int_env("LLM_TOP_K", 1)
+        self.vision_mode = os.getenv("LLM_VISION_MODE", "auto").strip().lower()
+        self.vision_allowlist = _safe_csv_env(
+            "LLM_VISION_MODEL_ALLOWLIST",
+            [
+                "gpt-4o",
+                "gpt-4.1",
+                "gemini-1.5",
+                "gemini-2.0",
+                "gemini-2.5",
+                "llava",
+                "vision",
+            ],
+        )
+        self.vision_blocklist = _safe_csv_env("LLM_VISION_MODEL_BLOCKLIST", [])
+        self.vision_max_images_per_request = max(
+            1,
+            _safe_int_env("LLM_VISION_MAX_IMAGES_PER_REQUEST", 6)
+        )
         self.llm = self._get_llm()
         self.parser = JsonOutputParser(pydantic_object=ReviewResponse)
+
+    def _supports_vision(self) -> bool:
+        """Resolve vision capability using explicit env config."""
+        model_name = (self.model_name or "").lower()
+
+        if any(fragment in model_name for fragment in self.vision_blocklist):
+            return False
+
+        if self.vision_mode == "on":
+            return True
+        if self.vision_mode == "off":
+            return False
+
+        return any(fragment in model_name for fragment in self.vision_allowlist)
+
+    def _build_image_batches(self, images: List[str]) -> List[List[str]]:
+        if not images:
+            return []
+        batch_size = max(1, self.vision_max_images_per_request)
+        return [
+            images[index:index + batch_size]
+            for index in range(0, len(images), batch_size)
+        ]
 
     def get_deterministic_profile_metadata(self) -> Dict[str, Any]:
         """Returns deterministic profile metadata used for cache fingerprinting and logging."""
@@ -247,6 +301,8 @@ class AIEngine:
             A dictionary containing the review results.
         """
         from services.checklist_loader import loader
+        images = images or []
+        text = text or ""
 
         target_checklist = []
         checklist_context = ""
@@ -373,7 +429,22 @@ class AIEngine:
 
         {reference_instructions}
 
-        3. **Multiple Requirements**: If a checklist item contains multiple requirements (e.g. "Benefits AND expected outcomes"), and the document only fulfills one of them (e.g. only benefits are found), you MUST mark the status as "Warning", explaining exactly which part is missing in the comment, and providing the location reference for the partial find (if applicable per rule 2).
+        3. **Evidence-First Decisioning**:
+        - Do not mark any checklist item as "Pass" unless you can quote concrete evidence from the parsed content or provided images.
+        - For every checklist comment, include this structure in one sentence: `Evidence: <quoted snippet or 'None'> | Found: <what is present> | Missing: <what is missing or 'None'>`.
+        - If evidence is weak or partial, use "Warning" instead of "Pass".
+        - If no evidence is present, use "Fail".
+        - Treat synonym labels as equivalent signals when evaluating evidence, including: `author`, `authors`, `document author`; `approver`, `approved by`; `revision history`, `change history`, `version history`; `version`, `document version`, `rev`.
+
+        4. **Multiple Requirements**: If a checklist item contains multiple requirements (e.g. "Benefits AND expected outcomes"), and the document only fulfills one of them (e.g. only benefits are found), you MUST mark the status as "Warning", explaining exactly which part is missing in the comment, and providing the location reference for the partial find (if applicable per rule 2).
+
+        5. **Referenced Requirements Interpretation**:
+        - "Referenced" can mean explicit textual traceability such as section IDs, requirement IDs, BRD references, "refer to" statements, links, or explicit mappings.
+        - If only generic statements are present without traceability detail, mark as "Warning".
+
+        6. **Parsed Marker Awareness**:
+        - Parsed content may include markers such as `--- Page X Text ---`, `--- Page X Tables ---`, `--- DOCX Table N ---`, `--- DOCX Header Section N ---`, `--- DOCX Core Properties ---`, and OCR markers.
+        - Use these markers for evidence and references. Never invent references outside provided markers.
 
         You must output a JSON object with the following structure:
         {{
@@ -390,13 +461,13 @@ class AIEngine:
         {checklist_context}
         """
         system_msg_content = system_prompt
-        
-        # Check if the selected model supports vision (heuristic)
-        supports_vision = any(v in self.model_name.lower() for v in ["gpt-4o", "gemini-1.5", "llava", "vision"])
+
+        supports_vision = self._supports_vision()
+        image_batches = self._build_image_batches(images) if supports_vision else []
 
         # File-aware chunking for .car files
-        chunks = []
-        
+        chunks: List[Dict[str, str]] = []
+
         # Check if text contains CAR metadata (indicates structured .car file)
         if "[CAR_METADATA]" in text and file_type and file_type.lower().strip('.') == "car":
             # Extract individual files from CAR archive
@@ -405,30 +476,76 @@ class AIEngine:
             if car_match:
                 file_count = int(car_match.group(2))
                 logger.info(f"Processing .car file with {file_count} embedded files")
-            
+
             # Split by file markers
             file_pattern = r'\n--- File: (.+?) ---\n'
             file_parts = re.split(file_pattern, text)
-            
+
             # file_parts[0] is empty, then alternating filename/content
             for i in range(1, len(file_parts), 2):
                 if i + 1 < len(file_parts):
                     filename = file_parts[i]
                     content = file_parts[i + 1]
-                    # Chunk each file by tokens
                     file_chunks = chunk_text(content)
                     for chunk in file_chunks:
                         chunks.append({
                             "filename": filename,
                             "content": chunk
                         })
-                logger.info(f"Chunked file: {filename} into {len(file_chunks)} parts")
+                    logger.info(f"Chunked file: {filename} into {len(file_chunks)} parts")
         else:
             # Fallback for non-.car files - use token-based chunking
             if text:
                 text_chunks = chunk_text(text)
+                if image_batches and len(image_batches) > len(text_chunks):
+                    # Increase chunk count so image batches can be distributed across calls.
+                    effective_max_tokens = max(1200, math.ceil(MAX_TOKENS * len(text_chunks) / len(image_batches)))
+                    text_chunks = chunk_text(text, max_tokens=effective_max_tokens)
                 chunks = [{"filename": "document", "content": chunk} for chunk in text_chunks]
-        
+
+        if not chunks:
+            chunks = [{
+                "filename": "document",
+                "content": "No extractable text was found. Use the available parsed metadata and images if present."
+            }]
+
+        # If there are more image batches than chunks, duplicate chunk contexts so every image batch is processed.
+        if image_batches and len(image_batches) > len(chunks):
+            original_chunks = list(chunks)
+            cursor = 0
+            while len(chunks) < len(image_batches):
+                template = original_chunks[cursor % len(original_chunks)]
+                chunks.append({
+                    "filename": template["filename"],
+                    "content": template["content"]
+                })
+                cursor += 1
+
+        chunk_image_batches: List[List[str]] = [[] for _ in chunks]
+        if image_batches:
+            for index, batch in enumerate(image_batches):
+                chunk_image_batches[index] = batch
+
+        if images and not supports_vision and not AIEngine._vision_disabled_warning_logged:
+            logger.warning(
+                "Images were extracted but not sent to model because vision is disabled for "
+                f"provider/model={self.provider}/{self.model_name}. "
+                "Set LLM_VISION_MODE=on or update LLM_VISION_MODEL_ALLOWLIST."
+            )
+            AIEngine._vision_disabled_warning_logged = True
+
+        images_sent_total = sum(len(batch) for batch in chunk_image_batches)
+        logger.info(
+            "Vision routing: "
+            f"provider_model={self.provider}/{self.model_name} "
+            f"vision_mode={self.vision_mode} "
+            f"vision_enabled={supports_vision} "
+            f"images_received={len(images)} "
+            f"image_batches={len(image_batches)} "
+            f"max_images_per_request={self.vision_max_images_per_request} "
+            f"images_sent={images_sent_total} "
+            f"chunks={len(chunks)}"
+        )
         logger.info(f"Total chunks to process: {len(chunks)}")
         
         # Configurable concurrency
@@ -444,9 +561,12 @@ class AIEngine:
         )
         logger.info(f"Using concurrency limit: {MAX_CONCURRENCY}")
 
-        async def process_chunk(chunk_index, chunk_data, semaphore):
+        async def process_chunk(chunk_index, chunk_data, image_batch, semaphore):
             async with semaphore:
-                logger.info(f"Processing chunk {chunk_index + 1}/{len(chunks)}: {chunk_data['filename']}")
+                logger.info(
+                    f"Processing chunk {chunk_index + 1}/{len(chunks)}: {chunk_data['filename']} "
+                    f"(image_batch_size={len(image_batch)})"
+                )
                 
                 # Build user message with file context
                 user_content = f"""File: {chunk_data['filename']}
@@ -456,10 +576,9 @@ Custom Instructions: {custom_instructions}
 Document Content (Part {chunk_index+1}):
 {chunk_data['content']}"""
 
-                # Add images only for first chunk if supported
-                if chunk_index == 0 and images and len(images) > 0 and supports_vision:
+                if image_batch and supports_vision:
                     user_content_obj = [{"type": "text", "text": user_content}]
-                    for img_b64 in images:
+                    for img_b64 in image_batch:
                         user_content_obj.append({
                             "type": "image_url",
                             "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
@@ -480,7 +599,10 @@ Document Content (Part {chunk_index+1}):
 
         try:
             semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
-            tasks = [process_chunk(i, chunk, semaphore) for i, chunk in enumerate(chunks)]
+            tasks = [
+                process_chunk(i, chunk, chunk_image_batches[i], semaphore)
+                for i, chunk in enumerate(chunks)
+            ]
             results = await asyncio.gather(*tasks)
             
             # Merge results

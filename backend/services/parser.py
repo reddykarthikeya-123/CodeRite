@@ -24,6 +24,8 @@ import platform
 import time
 from pathlib import Path
 from typing import Tuple, List, Dict, Any
+import xml.etree.ElementTree as ET
+import zipfile
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -103,6 +105,49 @@ def _extract_total_pages(text: str) -> int:
     if not matches:
         return 0
     return max(int(page) for page in matches)
+
+
+def _safe_int_env(name: str, default: int) -> int:
+    raw = os.getenv(name, str(default))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_str(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _extract_docx_custom_properties(content: bytes) -> Dict[str, str]:
+    """Extract custom document properties from a DOCX package."""
+    properties: Dict[str, str] = {}
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            if "docProps/custom.xml" not in archive.namelist():
+                return properties
+
+            xml_bytes = archive.read("docProps/custom.xml")
+            root = ET.fromstring(xml_bytes)
+            namespaces = {
+                "cp": "http://schemas.openxmlformats.org/officeDocument/2006/custom-properties"
+            }
+
+            for prop in root.findall("cp:property", namespaces):
+                name = _safe_str(prop.attrib.get("name"))
+                if not name:
+                    continue
+                value = ""
+                for child in list(prop):
+                    if child.text and child.text.strip():
+                        value = child.text.strip()
+                        break
+                properties[name] = value
+    except Exception as exc:
+        logger.warning(f"Unable to read DOCX custom properties: {exc}")
+    return properties
 
 
 def _resolve_soffice_path() -> str:
@@ -322,27 +367,37 @@ async def _parse_pdf_from_bytes(content: bytes) -> Tuple[str, List[str]]:
     Returns:
         A tuple of (extracted_text, list_of_base64_images).
     """
-    import asyncio
-    
-    text = ""
-    base64_images = []
+    text_parts: List[str] = []
+    base64_images: List[str] = []
+    page_text_lengths: List[int] = []
+    table_rows = 0
+    ocr_blocks = 0
+
+    ocr_mode = os.getenv("PDF_OCR_MODE", "always").strip().lower()
+    if ocr_mode not in {"always", "auto", "off"}:
+        ocr_mode = "always"
+    ocr_min_text_chars = _safe_int_env("PDF_OCR_MIN_TEXT_CHARS_PER_PAGE", 120)
+    ocr_max_pages = _safe_int_env("PDF_OCR_MAX_PAGES", 100)
 
     try:
         with pdfplumber.open(io.BytesIO(content)) as pdf:
             for i, page in enumerate(pdf.pages):
-                page_text = page.extract_text(layout=True)
-                if page_text:
-                    text += f"\n--- Page {i+1} Text ---\n{page_text}\n"
+                page_text = page.extract_text(layout=True) or ""
+                page_text_clean = page_text.strip()
+                page_text_lengths.append(len(page_text_clean))
+                if page_text_clean:
+                    text_parts.append(f"\n--- Page {i+1} Text ---\n{page_text}\n")
 
                 tables = page.extract_tables()
                 if tables:
-                    text += f"\n--- Page {i+1} Tables ---\n"
+                    text_parts.append(f"\n--- Page {i+1} Tables ---\n")
                     for table_idx, table in enumerate(tables):
-                        text += f"Table {table_idx + 1}:\n"
+                        text_parts.append(f"Table {table_idx + 1}:\n")
                         for row in table:
                             cleaned_row = [str(cell).replace("\n", " ").strip() if cell is not None else "" for cell in row]
-                            text += "| " + " | ".join(cleaned_row) + " |\n"
-                        text += "\n"
+                            text_parts.append("| " + " | ".join(cleaned_row) + " |\n")
+                            table_rows += 1
+                        text_parts.append("\n")
 
         # Process images with OCR in non-blocking manner
         images = convert_from_bytes(content)
@@ -352,13 +407,32 @@ async def _parse_pdf_from_bytes(content: bytes) -> Tuple[str, List[str]]:
             img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
             base64_images.append(img_b64)
 
-            # Run blocking OCR in thread pool to avoid blocking event loop
-            if len(text.strip()) < 100 * len(images):
+            if ocr_mode == "off":
+                should_ocr = False
+            elif ocr_mode == "always":
+                should_ocr = True
+            else:
+                page_text_len = page_text_lengths[i] if i < len(page_text_lengths) else 0
+                should_ocr = page_text_len < ocr_min_text_chars
+
+            if should_ocr and ocr_blocks < ocr_max_pages:
                 ocr_text = await asyncio.to_thread(pytesseract.image_to_string, img)
-                text += f"\n--- OCR Page {i+1} ---\n" + ocr_text + "\n"
+                if ocr_text.strip():
+                    text_parts.append(f"\n--- OCR Page {i+1} ---\n{ocr_text}\n")
+                    ocr_blocks += 1
     except Exception as e:
         logger.warning(f"OCR/Vision warning on PDF: {e}")
 
+    text = "".join(text_parts)
+    logger.info(
+        "PDF parse stats: "
+        f"pages={len(page_text_lengths)} "
+        f"tables_rows={table_rows} "
+        f"images_extracted={len(base64_images)} "
+        f"ocr_blocks={ocr_blocks} "
+        f"ocr_mode={ocr_mode} "
+        f"text_chars={len(text)}"
+    )
     return text, base64_images
 
 
@@ -405,29 +479,89 @@ async def _parse_docx_from_bytes(content: bytes) -> Tuple[str, List[str], Dict[s
 
     # Fallback path: extract text directly without page references.
     doc = Document(io.BytesIO(content))
-    text = ""
-    for para in doc.paragraphs:
-        if para.text.strip():
-            text += para.text + "\n"
+    text_parts: List[str] = []
+    paragraph_count = 0
+    table_row_count = 0
+    header_paragraph_count = 0
+    footer_paragraph_count = 0
+    ocr_blocks = 0
 
-    base64_images = []
+    # Include document properties for better metadata detection (version/author/etc.).
+    core = doc.core_properties
+    core_properties = {
+        "title": _safe_str(core.title),
+        "subject": _safe_str(core.subject),
+        "author": _safe_str(core.author),
+        "last_modified_by": _safe_str(core.last_modified_by),
+        "revision": _safe_str(core.revision),
+        "created": _safe_str(core.created),
+        "modified": _safe_str(core.modified),
+        "category": _safe_str(core.category),
+        "keywords": _safe_str(core.keywords),
+    }
+    custom_properties = _extract_docx_custom_properties(content)
+
+    text_parts.append("\n--- DOCX Core Properties ---\n")
+    for key, value in core_properties.items():
+        if value:
+            text_parts.append(f"{key}: {value}\n")
+
+    if custom_properties:
+        text_parts.append("\n--- DOCX Custom Properties ---\n")
+        for key, value in custom_properties.items():
+            text_parts.append(f"{key}: {value}\n")
+
+    text_parts.append("\n--- DOCX Body Paragraphs ---\n")
+    for para_index, para in enumerate(doc.paragraphs, start=1):
+        para_text = para.text.strip()
+        if para_text:
+            paragraph_count += 1
+            text_parts.append(f"P{para_index}: {para_text}\n")
+
+    for table_index, table in enumerate(doc.tables, start=1):
+        text_parts.append(f"\n--- DOCX Table {table_index} ---\n")
+        for row_index, row in enumerate(table.rows, start=1):
+            cleaned_row = [cell.text.replace("\n", " ").strip() for cell in row.cells]
+            if any(cleaned_row):
+                table_row_count += 1
+                text_parts.append(f"Row {row_index}: | " + " | ".join(cleaned_row) + " |\n")
+
+    for section_index, section in enumerate(doc.sections, start=1):
+        header_lines = [p.text.strip() for p in section.header.paragraphs if p.text and p.text.strip()]
+        if header_lines:
+            text_parts.append(f"\n--- DOCX Header Section {section_index} ---\n")
+            for line in header_lines:
+                header_paragraph_count += 1
+                text_parts.append(line + "\n")
+
+        footer_lines = [p.text.strip() for p in section.footer.paragraphs if p.text and p.text.strip()]
+        if footer_lines:
+            text_parts.append(f"\n--- DOCX Footer Section {section_index} ---\n")
+            for line in footer_lines:
+                footer_paragraph_count += 1
+                text_parts.append(line + "\n")
+
+    base64_images: List[str] = []
     try:
-        for rel in doc.part.rels.values():
+        for image_index, rel in enumerate(doc.part.rels.values(), start=1):
             if "image" in rel.target_ref:
                 img_data = rel.target_part.blob
                 img = Image.open(io.BytesIO(img_data))
                 buffered = io.BytesIO()
-                if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
                 img.save(buffered, format="JPEG")
                 img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
                 base64_images.append(img_b64)
 
                 ocr_text = await asyncio.to_thread(pytesseract.image_to_string, img)
                 if ocr_text.strip():
-                    text += f"\n--- Embedded Image OCR ---\n{ocr_text}\n"
+                    ocr_blocks += 1
+                    text_parts.append(f"\n--- DOCX Embedded Image OCR {image_index} ---\n{ocr_text}\n")
     except Exception as e:
         logger.warning(f"OCR/Vision warning on Docx: {e}")
 
+    text = "".join(text_parts)
     warning = (
         "Page references disabled for this file because Word-to-PDF pagination failed."
         if conversion_error else
@@ -442,7 +576,15 @@ async def _parse_docx_from_bytes(content: bytes) -> Tuple[str, List[str], Dict[s
     )
     logger.info(
         "DOCX pagination disabled; using fallback text extraction without page references. "
-        f"fallback_images_extracted={len(base64_images)}"
+        f"paragraphs={paragraph_count} "
+        f"table_rows={table_row_count} "
+        f"header_paragraphs={header_paragraph_count} "
+        f"footer_paragraphs={footer_paragraph_count} "
+        f"core_properties={sum(1 for value in core_properties.values() if value)} "
+        f"custom_properties={len(custom_properties)} "
+        f"fallback_images_extracted={len(base64_images)} "
+        f"ocr_blocks={ocr_blocks} "
+        f"text_chars={len(text)}"
     )
     return text, base64_images, pagination_metadata
 
@@ -508,7 +650,6 @@ async def _parse_excel_from_bytes(content: bytes, filename: str) -> str:
             text += df.to_csv(index=False) + "\n"
     return text
 
-import zipfile
 async def _parse_car_from_bytes(content: bytes) -> dict:
     """Recursively extract XML, XSL, WSDL, and properties from .car and .iar archives.
     
@@ -519,6 +660,7 @@ async def _parse_car_from_bytes(content: bytes) -> dict:
     total_size = 0
 
     def process_zip_content(zip_bytes, prefix=""):
+        nonlocal total_size
         try:
             with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
                 for info in z.infolist():

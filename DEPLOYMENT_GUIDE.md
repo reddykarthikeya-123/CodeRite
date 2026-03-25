@@ -75,6 +75,17 @@ DOCX_CONVERT_TIMEOUT_SEC=90
 
 # If true, DOCX analysis fails when pagination conversion fails
 DOCX_PAGINATION_REQUIRED=false
+
+# Vision routing controls (pure prompt+parsing path)
+LLM_VISION_MODE=auto
+LLM_VISION_MODEL_ALLOWLIST="gpt-4o,gpt-4.1,gemini-1.5,gemini-2.0,gemini-2.5,llava,vision"
+LLM_VISION_MODEL_BLOCKLIST=""
+LLM_VISION_MAX_IMAGES_PER_REQUEST=6
+
+# OCR extraction policy for PDF page images
+PDF_OCR_MODE=always
+PDF_OCR_MIN_TEXT_CHARS_PER_PAGE=120
+PDF_OCR_MAX_PAGES=100
 ```
 
 ---
