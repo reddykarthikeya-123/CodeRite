@@ -12,7 +12,7 @@ load_dotenv()
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 import json
 import shutil
@@ -20,6 +20,7 @@ import logging
 import platform
 import os
 import re
+import hashlib
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -47,6 +48,69 @@ from services.checklist_loader import loader
 app = FastAPI(title="Document Scorer API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+REQUEST_FINGERPRINT_PREFIX_LEN = 12
+
+
+def _is_truthy_env(value: str) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _safe_int_env(name: str, default: int) -> int:
+    raw = os.getenv(name, str(default))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _canonical_json(value: object) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def _json_deepcopy(value: object) -> object:
+    return json.loads(json.dumps(value))
+
+
+def _hash_images(images: Optional[List[str]]) -> List[str]:
+    if not images:
+        return []
+    return [_sha256_text(image or "") for image in images]
+
+
+def _get_checklist_snapshot_hash(category: Optional[str]) -> str:
+    if not category:
+        return _sha256_text("")
+    checklist_items = loader.get_checklist_for_category(category) or []
+    return _sha256_text(_canonical_json(checklist_items))
+
+
+def _build_request_fingerprint(
+    analysis_request: "AnalysisRequest",
+    provider: str,
+    model_name: str,
+    deterministic_profile: Dict[str, object],
+    checklist_snapshot_hash: str
+) -> str:
+    enabled_checks_sorted = sorted(analysis_request.enabled_checks or [])
+    fingerprint_payload = {
+        "text_hash": _sha256_text(analysis_request.text or ""),
+        "images_hashes": _hash_images(analysis_request.images or []),
+        "document_category": analysis_request.document_category,
+        "file_type": analysis_request.file_type,
+        "enabled_checks": enabled_checks_sorted,
+        "custom_instructions": analysis_request.custom_instructions or "",
+        "pagination_metadata": analysis_request.pagination_metadata or {},
+        "provider": provider,
+        "model_name": model_name,
+        "deterministic_profile": deterministic_profile,
+        "checklist_snapshot_hash": checklist_snapshot_hash,
+    }
+    return _sha256_text(_canonical_json(fingerprint_payload))
 
 # CORS Setup - Restricted to specific origins
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")
@@ -139,6 +203,8 @@ class AnalysisRequest(BaseModel):
     file_type: Optional[str] = None
     enabled_checks: Optional[List[str]] = None
     pagination_metadata: Optional[dict] = None
+    force_refresh: Optional[bool] = False
+    filename: Optional[str] = None
 
 class CodeFile(BaseModel):
     filename: str
@@ -391,14 +457,94 @@ async def analyze_document(request: Request, analysis_request: AnalysisRequest, 
         model_name = active_conn.model_name
 
         engine = AIEngine(provider=provider, model_name=model_name, api_key=api_key)
+        deterministic_profile = engine.get_deterministic_profile_metadata()
+        checklist_snapshot_hash = _get_checklist_snapshot_hash(analysis_request.document_category)
+        request_fingerprint = _build_request_fingerprint(
+            analysis_request=analysis_request,
+            provider=provider,
+            model_name=model_name,
+            deterministic_profile=deterministic_profile,
+            checklist_snapshot_hash=checklist_snapshot_hash
+        )
+        fingerprint_short = request_fingerprint[:REQUEST_FINGERPRINT_PREFIX_LEN]
+
+        cache_mode = os.getenv("LLM_CACHE_MODE", "exact_input").strip().lower()
+        use_exact_cache = cache_mode == "exact_input"
+        force_refresh = bool(analysis_request.force_refresh)
+        cache_ttl_days = _safe_int_env("LLM_CACHE_MAX_AGE_DAYS", 30)
+        deterministic_mode = bool(deterministic_profile.get("deterministic_mode", False))
+
+        if use_exact_cache and not force_refresh:
+            cache_query = (
+                select(DocumentReview)
+                .where(DocumentReview.content_hash == request_fingerprint)
+                .order_by(DocumentReview.created_at.desc(), DocumentReview.id.desc())
+                .limit(1)
+            )
+            if cache_ttl_days > 0:
+                cutoff = datetime.utcnow() - timedelta(days=cache_ttl_days)
+                cache_query = cache_query.where(DocumentReview.created_at >= cutoff)
+
+            cache_result = await db.execute(cache_query)
+            cached_review = cache_result.scalars().first()
+            if cached_review and isinstance(cached_review.full_response_json, dict):
+                cached_payload = _json_deepcopy(cached_review.full_response_json)
+                metadata = cached_payload.get("analysis_metadata", {})
+                if not isinstance(metadata, dict):
+                    metadata = {}
+
+                metadata.update({
+                    "cache_hit": True,
+                    "request_fingerprint": fingerprint_short,
+                    "deterministic_mode": deterministic_mode,
+                    "cache_mode": cache_mode,
+                    "provider": provider,
+                    "model_name": model_name
+                })
+                cached_payload["analysis_metadata"] = metadata
+
+                logger.info(
+                    f"analysis_fingerprint={fingerprint_short} cache_hit=True force_refresh={force_refresh} "
+                    f"provider={provider}/{model_name} deterministic_mode={deterministic_mode}"
+                )
+                return cached_payload
+
         review_result = await engine.analyze_document(
             analysis_request.text,
-            analysis_request.images,
+            analysis_request.images or [],
             analysis_request.custom_instructions,
             analysis_request.document_category,
             analysis_request.file_type,
             analysis_request.enabled_checks,
             analysis_request.pagination_metadata
+        )
+
+        review_result["analysis_metadata"] = {
+            "cache_hit": False,
+            "request_fingerprint": fingerprint_short,
+            "deterministic_mode": deterministic_mode,
+            "cache_mode": cache_mode,
+            "provider": provider,
+            "model_name": model_name
+        }
+
+        if use_exact_cache:
+            try:
+                review_record = DocumentReview(
+                    filename=analysis_request.filename or "",
+                    content_hash=request_fingerprint,
+                    score=float(review_result.get("score", 0)),
+                    full_response_json=_json_deepcopy(review_result)
+                )
+                db.add(review_record)
+                await db.commit()
+            except Exception as cache_save_error:
+                await db.rollback()
+                logger.warning(f"Failed to save analysis cache entry: {cache_save_error}")
+
+        logger.info(
+            f"analysis_fingerprint={fingerprint_short} cache_hit=False force_refresh={force_refresh} "
+            f"provider={provider}/{model_name} deterministic_mode={deterministic_mode}"
         )
 
         return review_result

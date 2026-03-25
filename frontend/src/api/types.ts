@@ -27,6 +27,15 @@ export interface PaginationMetadata {
   warning: string | null;
 }
 
+export interface AnalysisMetadata {
+  cache_hit: boolean;
+  request_fingerprint: string;
+  deterministic_mode?: boolean;
+  cache_mode?: string;
+  provider?: string;
+  model_name?: string;
+}
+
 export interface ReviewResponse {
   score: number;
   checklist: ChecklistItem[];
@@ -34,6 +43,7 @@ export interface ReviewResponse {
   rewritten_content?: string;
   filename?: string;
   pagination_warning?: string;
+  analysis_metadata?: AnalysisMetadata;
 }
 
 export interface CodeFileReview {
@@ -56,6 +66,8 @@ export interface AnalyzeDocumentRequest {
   file_type?: string;
   enabled_checks?: string[];
   pagination_metadata?: PaginationMetadata;
+  force_refresh?: boolean;
+  filename?: string;
 }
 
 export interface AnalyzeCodeRequest {

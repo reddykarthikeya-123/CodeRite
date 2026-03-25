@@ -14,6 +14,27 @@ import tiktoken
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
+DETERMINISTIC_PROFILE_VERSION = "det_profile_v1"
+
+
+def _is_truthy_env(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _safe_float_env(name: str, default: float) -> float:
+    raw = os.getenv(name, str(default))
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int_env(name: str, default: int) -> int:
+    raw = os.getenv(name, str(default))
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
 
 class ChecklistItem(BaseModel):
     section: str = Field(description="The section this item belongs to")
@@ -100,6 +121,7 @@ async def call_with_retry(chain, messages, retries: int = 3):
 
 class AIEngine:
     """Engine for interacting with various AI providers (OpenAI, Ollama, Gemini)."""
+    _ollama_seed_warning_logged = False
 
     def __init__(self, provider: str = "ollama", model_name: str = "llama3", api_key: str = None):
         """Initializes the AI Engine with the specified provider and model.
@@ -112,8 +134,25 @@ class AIEngine:
         self.provider = provider
         self.model_name = model_name
         self.api_key = api_key
+        self.deterministic_mode = _is_truthy_env(os.getenv("LLM_DETERMINISTIC_MODE", "true"))
+        self.profile_version = DETERMINISTIC_PROFILE_VERSION
+        self.temperature = _safe_float_env("LLM_TEMPERATURE", 0.0)
+        self.top_p = _safe_float_env("LLM_TOP_P", 1.0)
+        self.seed = _safe_int_env("LLM_SEED", 42)
+        self.top_k = _safe_int_env("LLM_TOP_K", 1)
         self.llm = self._get_llm()
         self.parser = JsonOutputParser(pydantic_object=ReviewResponse)
+
+    def get_deterministic_profile_metadata(self) -> Dict[str, Any]:
+        """Returns deterministic profile metadata used for cache fingerprinting and logging."""
+        return {
+            "version": self.profile_version,
+            "deterministic_mode": self.deterministic_mode,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "seed": self.seed,
+            "top_k": self.top_k if self.provider == "ollama" else None,
+        }
 
     def _get_llm(self):
         """Internal method to instantiate the correct LangChain Chat Model.
@@ -127,15 +166,40 @@ class AIEngine:
         if self.provider == "openai":
             if not self.api_key:
                 raise ValueError("OpenAI API Key is required")
-            return ChatOpenAI(model=self.model_name, api_key=self.api_key, temperature=0.0)
+            return ChatOpenAI(
+                model=self.model_name,
+                api_key=self.api_key,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                seed=self.seed,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+                n=1
+            )
         elif self.provider == "ollama":
              # Assuming default Ollama URL
             ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-            return ChatOllama(model=self.model_name, base_url=ollama_url, temperature=0.0)
+            if self.deterministic_mode and not AIEngine._ollama_seed_warning_logged:
+                logger.warning("Ollama wrapper does not expose seed; deterministic behavior is best-effort.")
+                AIEngine._ollama_seed_warning_logged = True
+            return ChatOllama(
+                model=self.model_name,
+                base_url=ollama_url,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                top_k=self.top_k,
+            )
         elif self.provider == "gemini":
             if not self.api_key:
                 raise ValueError("Google Gemini API Key is required")
-            return ChatGoogleGenerativeAI(model=self.model_name, google_api_key=self.api_key, temperature=0.0)
+            return ChatGoogleGenerativeAI(
+                model=self.model_name,
+                google_api_key=self.api_key,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                seed=self.seed,
+                n=1,
+            )
         else:
             raise ValueError(f"Unsupported provider: {self.provider}")
 
@@ -368,7 +432,16 @@ class AIEngine:
         logger.info(f"Total chunks to process: {len(chunks)}")
         
         # Configurable concurrency
-        MAX_CONCURRENCY = int(os.getenv("LLM_MAX_CONCURRENCY", "5"))
+        default_concurrency = "1" if self.deterministic_mode else "5"
+        MAX_CONCURRENCY = _safe_int_env("LLM_MAX_CONCURRENCY", int(default_concurrency))
+        logger.info(
+            "Deterministic profile: "
+            f"provider={self.provider}/{self.model_name}, "
+            f"deterministic_mode={self.deterministic_mode}, "
+            f"temperature={self.temperature}, top_p={self.top_p}, "
+            f"seed={self.seed}, max_concurrency={MAX_CONCURRENCY}, "
+            f"profile_version={self.profile_version}"
+        )
         logger.info(f"Using concurrency limit: {MAX_CONCURRENCY}")
 
         async def process_chunk(chunk_index, chunk_data, semaphore):
@@ -446,8 +519,18 @@ Document Content (Part {chunk_index+1}):
                             if item.get("comment") and item.get("comment") not in merged_checklist[key].get("comment", ""):
                                 merged_checklist[key]["comment"] += "\n" + item.get('comment', "")
 
+            checklist_items = list(merged_checklist.values())
+            checklist_items.sort(key=lambda i: (str(i.get("section", "")), str(i.get("item", ""))))
+
+            def suggestion_sort_key(suggestion: Any) -> tuple[str, str]:
+                if isinstance(suggestion, dict):
+                    return (str(suggestion.get("type", "")), str(suggestion.get("text", "")))
+                return ("", str(suggestion))
+
+            merged_suggestions.sort(key=suggestion_sort_key)
+
             final_response = {
-                "checklist": list(merged_checklist.values()),
+                "checklist": checklist_items,
                 "suggestions": merged_suggestions,
                 "rewritten_content": results[0].get("rewritten_content", "") if results else ""
             }

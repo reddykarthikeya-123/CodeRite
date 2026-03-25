@@ -115,7 +115,17 @@ function App() {
     setUploading(true);
 
     try {
-      const result = await analyzeDocument(content, "", category, images, fileType, checks, paginationMetadata);
+      const result = await analyzeDocument(
+        content,
+        "",
+        category,
+        images,
+        fileType,
+        checks,
+        paginationMetadata,
+        false,
+        filename
+      );
       const isWordFile = fileType === 'docx' || fileType === 'doc';
       const paginationWarning = isWordFile && paginationMetadata && !paginationMetadata.enabled
         ? (paginationMetadata.warning || "Page references disabled for this file because Word-to-PDF pagination failed.")

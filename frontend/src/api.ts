@@ -9,7 +9,8 @@ import type {
   BatchAutoFixRequest,
   BatchAutoFixResponse,
   ChecklistItem,
-  PaginationMetadata
+  PaginationMetadata,
+  AnalysisMetadata
 } from "./api/types";
 
 // Re-export types for convenience
@@ -24,7 +25,8 @@ export type {
   BatchAutoFixRequest,
   BatchAutoFixResponse,
   ChecklistItem,
-  PaginationMetadata
+  PaginationMetadata,
+  AnalysisMetadata
 };
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
@@ -157,7 +159,9 @@ export const analyzeDocument = async (
   images?: string[],
   fileType?: string,
   enabledChecks?: string[],
-  paginationMetadata?: PaginationMetadata
+  paginationMetadata?: PaginationMetadata,
+  forceRefresh?: boolean,
+  filename?: string
 ): Promise<ReviewResponse> => {
   const payload: AnalyzeDocumentRequest = {
     text,
@@ -168,6 +172,8 @@ export const analyzeDocument = async (
   if (fileType) payload.file_type = fileType;
   if (enabledChecks) payload.enabled_checks = enabledChecks;
   if (paginationMetadata) payload.pagination_metadata = paginationMetadata;
+  if (typeof forceRefresh === "boolean") payload.force_refresh = forceRefresh;
+  if (filename) payload.filename = filename;
 
   const response = await fetchWithTimeout(`${API_BASE_URL}/analyze`, {
     method: "POST",
