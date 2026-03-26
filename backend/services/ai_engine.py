@@ -15,7 +15,7 @@ import tiktoken
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
-DETERMINISTIC_PROFILE_VERSION = "det_profile_v3"
+DETERMINISTIC_PROFILE_VERSION = "det_profile_v4"
 
 
 def _is_truthy_env(value: str) -> bool:
@@ -92,6 +92,7 @@ def count_tokens(text: str, model: str = "gpt-4") -> int:
 
 # Token-based chunking function
 MAX_TOKENS = 6000  # Leave room for system prompt and response
+CHECKLIST_BATCH_SIZE = max(1, _safe_int_env("LLM_CHECKLIST_BATCH_SIZE", 10))
 
 def chunk_text(text: str, max_tokens: int = MAX_TOKENS) -> List[str]:
     """Split text into chunks based on token count."""
@@ -250,6 +251,11 @@ class AIEngine:
             for index in range(0, len(images), batch_size)
         ]
 
+    def _select_shared_images(self, images: List[str]) -> List[str]:
+        if not images:
+            return []
+        return images[:self.vision_max_images_per_request]
+
     def get_deterministic_profile_metadata(self) -> Dict[str, Any]:
         """Returns deterministic profile metadata used for cache fingerprinting and logging."""
         return {
@@ -358,7 +364,6 @@ class AIEngine:
         text = text or ""
 
         target_checklist = []
-        checklist_context = ""
         if document_category:
             all_items = loader.get_checklist_for_category(document_category)
             
@@ -381,8 +386,15 @@ class AIEngine:
                 logger.info(f"Filtered checklist from {len(all_items)} to {len(target_checklist)} items based on enabled_checks")
             else:
                 target_checklist = all_items
-            
-            checklist_context = "\nTarget Checklist exactly to follow:\n" + json.dumps(target_checklist, indent=2)
+
+        def build_checklist_context(checklist_subset: List[Dict[str, Any]]) -> str:
+            if not checklist_subset:
+                return ""
+            return (
+                f"\nOnly evaluate these {len(checklist_subset)} checklist items in this call.\n"
+                "Target Checklist exactly to follow:\n"
+                f"{json.dumps(checklist_subset, indent=2)}"
+            )
 
         expected_checklist_entries: List[Dict[str, str]] = []
         expected_key_order: Dict[tuple[str, str], int] = {}
@@ -433,6 +445,8 @@ class AIEngine:
                 reference_format = "Page" if file_type in ["pdf"] else "Slide"
             elif file_type in ["xlsx", "xls", "csv"]:
                 reference_format = "Sheet"  # Will be formatted as "Sheet: SheetName" in output
+
+        is_car_analysis = bool("[CAR_METADATA]" in text and file_type == "car")
 
         # Extract total page count from document text for validation
         import re
@@ -494,6 +508,14 @@ class AIEngine:
         else:
             reference_instructions = """2. **Location References**: Do NOT include page/sheet/slide references for this file type. Provide comments based on content evidence without location prefixes."""
 
+        segmentation_instructions = (
+            """        - This input may be one segment of a multi-file or chunked document. If the current segment contains no relevant evidence for an item, use status exactly `Not Seen` for this segment instead of `Fail`.
+        - Do not use `Fail` merely because the current segment does not mention something. Use `Fail` only when the current segment contains affirmative evidence that the requirement is missing, incorrect, placeholder-only, or contradicted."""
+            if is_car_analysis else
+            """        - The full document is provided in this call. Do not use status `Not Seen`.
+        - Every checklist item in this call must resolve to `Pass`, `Warning`, `Fail`, or `Not Applicable` using the full document context."""
+        )
+
         system_prompt = f"""You are an expert document auditor and reviewer.
         Your task is to review the provided document against standard best practices, any custom instructions, and strictly against the Target Checklist provided.
         You must evaluate *every single item* in the target checklist.
@@ -511,8 +533,7 @@ class AIEngine:
         - If no evidence is present, use "Fail".
         - Treat synonym labels as equivalent signals when evaluating evidence, including: `author`, `authors`, `document author`; `approver`, `approved by`; `revision history`, `change history`, `version history`; `version`, `document version`, `rev`.
         - A heading or label alone is never enough to pass a checklist item. Example: a heading like `Workflow Diagram`, `Process Flow`, `Architecture Diagram`, or `Screenshot` does NOT count as the artifact itself.
-        - This document may be split across multiple chunks. If the current chunk contains no relevant evidence for an item, use status exactly `Not Seen` for this chunk instead of `Fail`.
-        - Do not use `Fail` merely because the current chunk does not mention something. Use `Fail` only when the current chunk contains affirmative evidence that the requirement is missing, incorrect, placeholder-only, or contradicted.
+{segmentation_instructions}
 
         4. **Visual Artifact Rules**:
         - For checklist items that require process flows, diagrams, screenshots, wireframes, charts, or other visuals, require evidence of an actual visual artifact.
@@ -542,18 +563,15 @@ class AIEngine:
         }}
 
         Ensure the tone is professional and constructive.
-        {checklist_context}
         """
-        system_msg_content = system_prompt
-
         supports_vision = self._supports_vision()
-        image_batches = self._build_image_batches(images) if supports_vision else []
+        dispatch_mode = "car_file_chunking" if is_car_analysis else "checklist_batching"
+        analysis_tasks: List[Dict[str, Any]] = []
+        image_batches: List[List[str]] = []
 
-        # File-aware chunking for .car files
-        chunks: List[Dict[str, str]] = []
+        if is_car_analysis:
+            image_batches = self._build_image_batches(images) if supports_vision else []
 
-        # Check if text contains CAR metadata (indicates structured .car file)
-        if "[CAR_METADATA]" in text and file_type and file_type.lower().strip('.') == "car":
             # Extract individual files from CAR archive
             import re
             car_match = re.search(r'\[CAR_METADATA\] total_size=(\d+), file_count=(\d+) \[/CAR_METADATA\]', text)
@@ -561,54 +579,70 @@ class AIEngine:
                 file_count = int(car_match.group(2))
                 logger.info(f"Processing .car file with {file_count} embedded files")
 
-            # Split by file markers
             file_pattern = r'\n--- File: (.+?) ---\n'
             file_parts = re.split(file_pattern, text)
 
-            # file_parts[0] is empty, then alternating filename/content
             for i in range(1, len(file_parts), 2):
                 if i + 1 < len(file_parts):
                     filename = file_parts[i]
                     content = file_parts[i + 1]
                     file_chunks = chunk_text(content)
-                    for chunk in file_chunks:
-                        chunks.append({
+                    for chunk_index, chunk in enumerate(file_chunks):
+                        analysis_tasks.append({
+                            "mode": "car_chunk",
                             "filename": filename,
-                            "content": chunk
+                            "content": chunk,
+                            "checklist": target_checklist,
+                            "scope_label": f"File segment {chunk_index + 1}/{len(file_chunks)}",
                         })
                     logger.info(f"Chunked file: {filename} into {len(file_chunks)} parts")
+
+            if not analysis_tasks:
+                analysis_tasks = [{
+                    "mode": "car_chunk",
+                    "filename": "document",
+                    "content": "No extractable text was found. Use the available parsed metadata and images if present.",
+                    "checklist": target_checklist,
+                    "scope_label": "Fallback segment",
+                }]
+
+            if image_batches and len(image_batches) > len(analysis_tasks):
+                original_tasks = list(analysis_tasks)
+                cursor = 0
+                while len(analysis_tasks) < len(image_batches):
+                    template = original_tasks[cursor % len(original_tasks)]
+                    analysis_tasks.append({
+                        "mode": template["mode"],
+                        "filename": template["filename"],
+                        "content": template["content"],
+                        "checklist": template["checklist"],
+                        "scope_label": template["scope_label"],
+                    })
+                    cursor += 1
+
+            task_image_batches: List[List[str]] = [[] for _ in analysis_tasks]
+            if image_batches:
+                for index, batch in enumerate(image_batches):
+                    task_image_batches[index] = batch
         else:
-            # Fallback for non-.car files - use token-based chunking
-            if text:
-                text_chunks = chunk_text(text)
-                if image_batches and len(image_batches) > len(text_chunks):
-                    # Increase chunk count so image batches can be distributed across calls.
-                    effective_max_tokens = max(1200, math.ceil(MAX_TOKENS * len(text_chunks) / len(image_batches)))
-                    text_chunks = chunk_text(text, max_tokens=effective_max_tokens)
-                chunks = [{"filename": "document", "content": chunk} for chunk in text_chunks]
+            document_content = text or "No extractable text was found. Use the available parsed metadata and images if present."
+            checklist_batches = [
+                target_checklist[index:index + CHECKLIST_BATCH_SIZE]
+                for index in range(0, len(target_checklist), CHECKLIST_BATCH_SIZE)
+            ] if target_checklist else [[]]
 
-        if not chunks:
-            chunks = [{
-                "filename": "document",
-                "content": "No extractable text was found. Use the available parsed metadata and images if present."
-            }]
-
-        # If there are more image batches than chunks, duplicate chunk contexts so every image batch is processed.
-        if image_batches and len(image_batches) > len(chunks):
-            original_chunks = list(chunks)
-            cursor = 0
-            while len(chunks) < len(image_batches):
-                template = original_chunks[cursor % len(original_chunks)]
-                chunks.append({
-                    "filename": template["filename"],
-                    "content": template["content"]
+            for batch_index, checklist_batch in enumerate(checklist_batches):
+                analysis_tasks.append({
+                    "mode": "checklist_batch",
+                    "filename": "document",
+                    "content": document_content,
+                    "checklist": checklist_batch,
+                    "scope_label": f"Checklist batch {batch_index + 1}/{len(checklist_batches)}",
                 })
-                cursor += 1
 
-        chunk_image_batches: List[List[str]] = [[] for _ in chunks]
-        if image_batches:
-            for index, batch in enumerate(image_batches):
-                chunk_image_batches[index] = batch
+            shared_image_batch = self._select_shared_images(images) if supports_vision else []
+            image_batches = [shared_image_batch] if shared_image_batch else []
+            task_image_batches = [list(shared_image_batch) for _ in analysis_tasks]
 
         if images and not supports_vision and not AIEngine._vision_disabled_warning_logged:
             logger.warning(
@@ -619,11 +653,12 @@ class AIEngine:
             AIEngine._vision_disabled_warning_logged = True
 
         image_chars_total = sum(len(image) for image in images)
-        images_sent_total = sum(len(batch) for batch in chunk_image_batches)
-        image_chars_sent = sum(len(image) for batch in chunk_image_batches for image in batch)
+        images_sent_total = sum(len(batch) for batch in task_image_batches)
+        image_chars_sent = sum(len(image) for batch in task_image_batches for image in batch)
         logger.info(
             "Vision routing: "
             f"provider_model={self.provider}/{self.model_name} "
+            f"dispatch_mode={dispatch_mode} "
             f"vision_mode={self.vision_mode} "
             f"vision_enabled={supports_vision} "
             f"images_received={len(images)} "
@@ -632,9 +667,9 @@ class AIEngine:
             f"max_images_per_request={self.vision_max_images_per_request} "
             f"images_sent={images_sent_total} "
             f"image_chars_sent={image_chars_sent} "
-            f"chunks={len(chunks)}"
+            f"tasks={len(analysis_tasks)}"
         )
-        logger.info(f"Total chunks to process: {len(chunks)}")
+        logger.info(f"Total analysis tasks to process: {len(analysis_tasks)}")
         
         # Configurable concurrency
         default_concurrency = "1" if self.deterministic_mode else "5"
@@ -649,20 +684,33 @@ class AIEngine:
         )
         logger.info(f"Using concurrency limit: {MAX_CONCURRENCY}")
 
-        async def process_chunk(chunk_index, chunk_data, image_batch, semaphore):
+        async def process_batch(task_index, task_data, image_batch, semaphore):
             async with semaphore:
                 logger.info(
-                    f"Processing chunk {chunk_index + 1}/{len(chunks)}: {chunk_data['filename']} "
+                    f"Processing task {task_index + 1}/{len(analysis_tasks)}: {task_data['filename']} "
+                    f"mode={task_data['mode']} "
+                    f"scope={task_data['scope_label']} "
                     f"(image_batch_size={len(image_batch)})"
                 )
-                
-                # Build user message with file context
-                user_content = f"""File: {chunk_data['filename']}
+
+                batch_checklist_context = build_checklist_context(task_data.get("checklist", []))
+                system_msg_content = (
+                    f"{system_prompt}\n{batch_checklist_context}"
+                    if batch_checklist_context else system_prompt
+                )
+
+                content_heading = (
+                    f"Document Content Segment {task_index + 1}:"
+                    if task_data["mode"] == "car_chunk"
+                    else "Full Document Content:"
+                )
+                user_content = f"""File: {task_data['filename']}
+Scope: {task_data['scope_label']}
 
 Custom Instructions: {custom_instructions}
 
-Document Content (Part {chunk_index+1}):
-{chunk_data['content']}"""
+{content_heading}
+{task_data['content']}"""
 
                 chain = self.llm | self.parser
                 text_only_messages = [
@@ -687,9 +735,9 @@ Document Content (Part {chunk_index+1}):
                     except Exception as exc:
                         if _looks_like_image_payload_error(exc):
                             logger.warning(
-                                "Vision payload rejected; retrying chunk without images. "
+                                "Vision payload rejected; retrying task without images. "
                                 f"provider_model={self.provider}/{self.model_name} "
-                                f"chunk={chunk_index + 1} "
+                                f"task={task_index + 1} "
                                 f"image_batch_size={len(image_batch)} "
                                 f"error={str(exc)}"
                             )
@@ -701,8 +749,8 @@ Document Content (Part {chunk_index+1}):
         try:
             semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
             tasks = [
-                process_chunk(i, chunk, chunk_image_batches[i], semaphore)
-                for i, chunk in enumerate(chunks)
+                process_batch(i, task_data, task_image_batches[i], semaphore)
+                for i, task_data in enumerate(analysis_tasks)
             ]
             results = await asyncio.gather(*tasks)
             
@@ -738,56 +786,6 @@ Document Content (Part {chunk_index+1}):
                 if comment and comment not in target:
                     target.append(comment)
 
-            def finalize_document_status(statuses: List[str]) -> str:
-                meaningful_statuses = {status for status in statuses if status not in {"not_seen", "na"}}
-                if "pass" in meaningful_statuses:
-                    if meaningful_statuses == {"pass"}:
-                        return "pass"
-                    return "warning"
-                if "warning" in meaningful_statuses:
-                    return "warning"
-                if "fail" in meaningful_statuses:
-                    return "fail"
-                if "na" in statuses:
-                    return "na"
-                return "fail"
-
-            def build_merged_comment(final_status: str, comments_by_status: Dict[str, List[str]]) -> str:
-                combined_comments: List[str] = []
-
-                if final_status == "pass":
-                    status_order = ["pass", "warning", "fail"]
-                elif final_status == "warning":
-                    status_order = ["warning", "fail", "pass"]
-                elif final_status == "fail":
-                    status_order = ["fail", "warning", "pass"]
-                else:
-                    status_order = ["na", "pass", "warning", "fail"]
-
-                for status_name in status_order:
-                    for comment in comments_by_status.get(status_name, []):
-                        append_unique_comment(combined_comments, comment)
-
-                if (
-                    final_status == "warning"
-                    and comments_by_status.get("pass")
-                    and (comments_by_status.get("warning") or comments_by_status.get("fail"))
-                ):
-                    combined_comments.insert(
-                        0,
-                        "Conflicting chunk-level findings were returned. Evidence was found in at least one chunk, but other chunks raised concerns."
-                    )
-
-                if combined_comments:
-                    return "\n".join(combined_comments)
-                if final_status == "fail":
-                    return "No supporting evidence was found anywhere in the analyzed document."
-                if final_status == "warning":
-                    return "Evidence is partial or conflicting across the analyzed document."
-                if final_status == "na":
-                    return "This item appears not applicable to the analyzed document."
-                return "Supporting evidence was found in the analyzed document."
-
             def checklist_sort_key(item: Dict[str, Any]) -> tuple[int, int, str, str]:
                 key = (str(item.get("section", "")), str(item.get("item", "")))
                 expected_index = expected_key_order.get(key)
@@ -795,60 +793,147 @@ Document Content (Part {chunk_index+1}):
                     return (0, expected_index, key[0], key[1])
                 return (1, math.inf, key[0], key[1])
 
-            merged_checklist: Dict[tuple[str, str], Dict[str, Any]] = {}
-            merged_item_state: Dict[tuple[str, str], Dict[str, Any]] = {}
-
-            def ensure_item_bucket(
-                section: str,
-                item_text: str,
-                template: Optional[Dict[str, Any]] = None,
-            ) -> tuple[str, str]:
-                key = (section, item_text)
-                if key not in merged_checklist:
-                    base_item = dict(template) if template else {}
-                    base_item["section"] = section
-                    base_item["item"] = item_text
-                    merged_checklist[key] = base_item
-                    merged_item_state[key] = {
-                        "statuses": [],
-                        "comments_by_status": {
-                            "pass": [],
-                            "warning": [],
-                            "fail": [],
-                            "na": [],
-                            "not_seen": [],
-                        },
-                    }
-                return key
-
-            for expected_item in expected_checklist_entries:
-                ensure_item_bucket(expected_item["section"], expected_item["item"])
-
-            for res in results:
-                for item in res.get("checklist", []):
-                    section = str(item.get("section") or "General")
-                    item_text = str(item.get("item") or "").strip()
-                    if not item_text:
-                        continue
-
-                    key = ensure_item_bucket(section, item_text, item)
-                    normalized_status = normalize_review_status(item.get("status"))
-                    merged_item_state[key]["statuses"].append(normalized_status)
-                    append_unique_comment(
-                        merged_item_state[key]["comments_by_status"][normalized_status],
-                        item.get("comment", ""),
-                    )
-
             checklist_items: List[Dict[str, Any]] = []
-            for key, merged_item in merged_checklist.items():
-                state = merged_item_state.get(key, {
-                    "statuses": [],
-                    "comments_by_status": {"pass": [], "warning": [], "fail": [], "na": [], "not_seen": []},
-                })
-                final_status = finalize_document_status(state["statuses"])
-                merged_item["status"] = format_review_status(final_status)
-                merged_item["comment"] = build_merged_comment(final_status, state["comments_by_status"])
-                checklist_items.append(merged_item)
+            if is_car_analysis:
+                def finalize_document_status(statuses: List[str]) -> str:
+                    meaningful_statuses = {status for status in statuses if status not in {"not_seen", "na"}}
+                    if "pass" in meaningful_statuses:
+                        if meaningful_statuses == {"pass"}:
+                            return "pass"
+                        return "warning"
+                    if "warning" in meaningful_statuses:
+                        return "warning"
+                    if "fail" in meaningful_statuses:
+                        return "fail"
+                    if "na" in statuses:
+                        return "na"
+                    return "fail"
+
+                def build_merged_comment(final_status: str, comments_by_status: Dict[str, List[str]]) -> str:
+                    combined_comments: List[str] = []
+
+                    if final_status == "pass":
+                        status_order = ["pass", "warning", "fail"]
+                    elif final_status == "warning":
+                        status_order = ["warning", "fail", "pass"]
+                    elif final_status == "fail":
+                        status_order = ["fail", "warning", "pass"]
+                    else:
+                        status_order = ["na", "pass", "warning", "fail"]
+
+                    for status_name in status_order:
+                        for comment in comments_by_status.get(status_name, []):
+                            append_unique_comment(combined_comments, comment)
+
+                    if (
+                        final_status == "warning"
+                        and comments_by_status.get("pass")
+                        and (comments_by_status.get("warning") or comments_by_status.get("fail"))
+                    ):
+                        combined_comments.insert(
+                            0,
+                            "Conflicting chunk-level findings were returned. Evidence was found in at least one chunk, but other chunks raised concerns."
+                        )
+
+                    if combined_comments:
+                        return "\n".join(combined_comments)
+                    if final_status == "fail":
+                        return "No supporting evidence was found anywhere in the analyzed document."
+                    if final_status == "warning":
+                        return "Evidence is partial or conflicting across the analyzed document."
+                    if final_status == "na":
+                        return "This item appears not applicable to the analyzed document."
+                    return "Supporting evidence was found in the analyzed document."
+
+                merged_checklist: Dict[tuple[str, str], Dict[str, Any]] = {}
+                merged_item_state: Dict[tuple[str, str], Dict[str, Any]] = {}
+
+                def ensure_item_bucket(
+                    section: str,
+                    item_text: str,
+                    template: Optional[Dict[str, Any]] = None,
+                ) -> tuple[str, str]:
+                    key = (section, item_text)
+                    if key not in merged_checklist:
+                        base_item = dict(template) if template else {}
+                        base_item["section"] = section
+                        base_item["item"] = item_text
+                        merged_checklist[key] = base_item
+                        merged_item_state[key] = {
+                            "statuses": [],
+                            "comments_by_status": {
+                                "pass": [],
+                                "warning": [],
+                                "fail": [],
+                                "na": [],
+                                "not_seen": [],
+                            },
+                        }
+                    return key
+
+                for expected_item in expected_checklist_entries:
+                    ensure_item_bucket(expected_item["section"], expected_item["item"])
+
+                for res in results:
+                    for item in res.get("checklist", []):
+                        section = str(item.get("section") or "General").strip()
+                        item_text = str(item.get("item") or "").strip()
+                        if not item_text:
+                            continue
+
+                        key = ensure_item_bucket(section, item_text, item)
+                        normalized_status = normalize_review_status(item.get("status"))
+                        merged_item_state[key]["statuses"].append(normalized_status)
+                        append_unique_comment(
+                            merged_item_state[key]["comments_by_status"][normalized_status],
+                            item.get("comment", ""),
+                        )
+
+                for key, merged_item in merged_checklist.items():
+                    state = merged_item_state.get(key, {
+                        "statuses": [],
+                        "comments_by_status": {"pass": [], "warning": [], "fail": [], "na": [], "not_seen": []},
+                    })
+                    final_status = finalize_document_status(state["statuses"])
+                    merged_item["status"] = format_review_status(final_status)
+                    merged_item["comment"] = build_merged_comment(final_status, state["comments_by_status"])
+                    checklist_items.append(merged_item)
+            else:
+                checklist_items_map: Dict[tuple[str, str], Dict[str, Any]] = {}
+
+                for res in results:
+                    for item in res.get("checklist", []):
+                        section = str(item.get("section") or "General").strip()
+                        item_text = str(item.get("item") or "").strip()
+                        if not item_text:
+                            continue
+
+                        normalized_status = normalize_review_status(item.get("status"))
+                        item_copy = dict(item)
+                        item_copy["section"] = section
+                        item_copy["item"] = item_text
+
+                        if normalized_status == "not_seen":
+                            item_copy["status"] = "Fail"
+                            item_copy["comment"] = (
+                                str(item_copy.get("comment") or "").strip()
+                                or "No supporting evidence was found anywhere in the analyzed document."
+                            )
+                        else:
+                            item_copy["status"] = format_review_status(normalized_status)
+                        checklist_items_map[(section, item_text)] = item_copy
+
+                for expected_item in expected_checklist_entries:
+                    key = (expected_item["section"], expected_item["item"])
+                    if key not in checklist_items_map:
+                        checklist_items_map[key] = {
+                            "section": expected_item["section"],
+                            "item": expected_item["item"],
+                            "status": "Fail",
+                            "comment": "No result was returned for this checklist item.",
+                        }
+
+                checklist_items = list(checklist_items_map.values())
 
             checklist_items.sort(key=checklist_sort_key)
 
