@@ -150,6 +150,69 @@ def _extract_docx_custom_properties(content: bytes) -> Dict[str, str]:
     return properties
 
 
+def _normalize_image_for_model(image: Image.Image) -> Image.Image:
+    """Normalize images before OCR/model transport to keep payloads stable."""
+    normalized = image
+    if normalized.mode in ("RGBA", "P"):
+        normalized = normalized.convert("RGB")
+    elif normalized.mode != "RGB":
+        normalized = normalized.convert("RGB")
+
+    max_dimension = max(256, _safe_int_env("VISION_IMAGE_MAX_DIM", 1600))
+    width, height = normalized.size
+    longest_side = max(width, height)
+    if longest_side > max_dimension:
+        scale = max_dimension / float(longest_side)
+        resized = (
+            max(1, int(width * scale)),
+            max(1, int(height * scale))
+        )
+        normalized = normalized.resize(resized, Image.LANCZOS)
+
+    return normalized
+
+
+def _prepare_image_for_model(image: Image.Image) -> tuple[Image.Image, str, int]:
+    """Return normalized PIL image plus encoded JPEG payload details."""
+    normalized = _normalize_image_for_model(image)
+    jpeg_quality = max(40, min(95, _safe_int_env("VISION_IMAGE_JPEG_QUALITY", 80)))
+    buffered = io.BytesIO()
+    normalized.save(
+        buffered,
+        format="JPEG",
+        quality=jpeg_quality,
+        optimize=True
+    )
+    image_bytes = buffered.getvalue()
+    return normalized, base64.b64encode(image_bytes).decode("utf-8"), len(image_bytes)
+
+
+def _get_pdf_visual_counts(page: pdfplumber.page.Page) -> Dict[str, int]:
+    """Collect page-level visual object counts for OCR gating and LLM grounding."""
+    return {
+        "image_objects": len(page.images),
+        "line_objects": len(page.lines),
+        "rect_objects": len(page.rects),
+        "curve_objects": len(page.curves),
+    }
+
+
+def _format_pdf_visual_metadata(page_number: int, visual_counts: Dict[str, int]) -> str:
+    """Summarize page-level visual object counts for LLM grounding."""
+    image_objects = visual_counts["image_objects"]
+    line_objects = visual_counts["line_objects"]
+    rect_objects = visual_counts["rect_objects"]
+    curve_objects = visual_counts["curve_objects"]
+
+    return (
+        f"\n--- Page {page_number} Visual Metadata ---\n"
+        f"image_objects={image_objects}\n"
+        f"line_objects={line_objects}\n"
+        f"rect_objects={rect_objects}\n"
+        f"curve_objects={curve_objects}\n"
+    )
+
+
 def _resolve_soffice_path() -> str:
     configured_path = os.getenv("SOFFICE_PATH", "").strip()
     if configured_path:
@@ -352,6 +415,15 @@ async def parse_file(file: UploadFile) -> dict:
             # Store structured data for AI engine to use
             text_content = f"{text_content}\n\n[CAR_METADATA] total_size={parsed_data['total_size']}, file_count={parsed_data['file_count']} [/CAR_METADATA]"
 
+        logger.info(
+            "File parse completed: "
+            f"filename={filename} "
+            f"text_chars={len(text_content)} "
+            f"images={len(images)} "
+            f"image_chars_total={sum(len(image) for image in images)} "
+            f"pagination_enabled={pagination_metadata.get('enabled')} "
+            f"pagination_provider={pagination_metadata.get('provider')}"
+        )
         return {"text": text_content, "images": images, "pagination_metadata": pagination_metadata}
     except Exception as e:
         logger.error(f"Error parsing file '{filename}': {e}", exc_info=True)
@@ -370,14 +442,18 @@ async def _parse_pdf_from_bytes(content: bytes) -> Tuple[str, List[str]]:
     text_parts: List[str] = []
     base64_images: List[str] = []
     page_text_lengths: List[int] = []
+    page_visual_counts: List[Dict[str, int]] = []
     table_rows = 0
     ocr_blocks = 0
+    image_bytes_total = 0
 
     ocr_mode = os.getenv("PDF_OCR_MODE", "always").strip().lower()
     if ocr_mode not in {"always", "auto", "off"}:
         ocr_mode = "always"
     ocr_min_text_chars = _safe_int_env("PDF_OCR_MIN_TEXT_CHARS_PER_PAGE", 120)
     ocr_max_pages = _safe_int_env("PDF_OCR_MAX_PAGES", 100)
+    ocr_visual_object_threshold = max(1, _safe_int_env("PDF_OCR_VISUAL_OBJECT_THRESHOLD", 8))
+    render_dpi = max(72, _safe_int_env("PDF_RENDER_DPI", 160))
 
     try:
         with pdfplumber.open(io.BytesIO(content)) as pdf:
@@ -385,6 +461,8 @@ async def _parse_pdf_from_bytes(content: bytes) -> Tuple[str, List[str]]:
                 page_text = page.extract_text(layout=True) or ""
                 page_text_clean = page_text.strip()
                 page_text_lengths.append(len(page_text_clean))
+                visual_counts = _get_pdf_visual_counts(page)
+                page_visual_counts.append(visual_counts)
                 if page_text_clean:
                     text_parts.append(f"\n--- Page {i+1} Text ---\n{page_text}\n")
 
@@ -399,13 +477,14 @@ async def _parse_pdf_from_bytes(content: bytes) -> Tuple[str, List[str]]:
                             table_rows += 1
                         text_parts.append("\n")
 
+                text_parts.append(_format_pdf_visual_metadata(i + 1, visual_counts))
+
         # Process images with OCR in non-blocking manner
-        images = convert_from_bytes(content)
+        images = convert_from_bytes(content, dpi=render_dpi)
         for i, img in enumerate(images):
-            buffered = io.BytesIO()
-            img.save(buffered, format="JPEG")
-            img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            normalized_img, img_b64, image_bytes = _prepare_image_for_model(img)
             base64_images.append(img_b64)
+            image_bytes_total += image_bytes
 
             if ocr_mode == "off":
                 should_ocr = False
@@ -413,7 +492,18 @@ async def _parse_pdf_from_bytes(content: bytes) -> Tuple[str, List[str]]:
                 should_ocr = True
             else:
                 page_text_len = page_text_lengths[i] if i < len(page_text_lengths) else 0
-                should_ocr = page_text_len < ocr_min_text_chars
+                visual_counts = page_visual_counts[i] if i < len(page_visual_counts) else {}
+                visual_object_count = sum(int(value) for value in visual_counts.values())
+                has_explicit_visual_artifact = (
+                    int(visual_counts.get("image_objects", 0)) > 0 or
+                    int(visual_counts.get("rect_objects", 0)) > 0 or
+                    int(visual_counts.get("curve_objects", 0)) > 0
+                )
+                should_ocr = (
+                    page_text_len < ocr_min_text_chars or
+                    has_explicit_visual_artifact or
+                    visual_object_count >= ocr_visual_object_threshold
+                )
 
             if should_ocr and ocr_blocks < ocr_max_pages:
                 ocr_text = await asyncio.to_thread(pytesseract.image_to_string, img)
@@ -429,8 +519,11 @@ async def _parse_pdf_from_bytes(content: bytes) -> Tuple[str, List[str]]:
         f"pages={len(page_text_lengths)} "
         f"tables_rows={table_rows} "
         f"images_extracted={len(base64_images)} "
+        f"image_bytes_total={image_bytes_total} "
         f"ocr_blocks={ocr_blocks} "
         f"ocr_mode={ocr_mode} "
+        f"ocr_visual_object_threshold={ocr_visual_object_threshold} "
+        f"render_dpi={render_dpi} "
         f"text_chars={len(text)}"
     )
     return text, base64_images
@@ -485,6 +578,7 @@ async def _parse_docx_from_bytes(content: bytes) -> Tuple[str, List[str], Dict[s
     header_paragraph_count = 0
     footer_paragraph_count = 0
     ocr_blocks = 0
+    image_bytes_total = 0
 
     # Include document properties for better metadata detection (version/author/etc.).
     core = doc.core_properties
@@ -547,14 +641,11 @@ async def _parse_docx_from_bytes(content: bytes) -> Tuple[str, List[str], Dict[s
             if "image" in rel.target_ref:
                 img_data = rel.target_part.blob
                 img = Image.open(io.BytesIO(img_data))
-                buffered = io.BytesIO()
-                if img.mode in ("RGBA", "P"):
-                    img = img.convert("RGB")
-                img.save(buffered, format="JPEG")
-                img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                normalized_img, img_b64, image_bytes = _prepare_image_for_model(img)
                 base64_images.append(img_b64)
+                image_bytes_total += image_bytes
 
-                ocr_text = await asyncio.to_thread(pytesseract.image_to_string, img)
+                ocr_text = await asyncio.to_thread(pytesseract.image_to_string, normalized_img)
                 if ocr_text.strip():
                     ocr_blocks += 1
                     text_parts.append(f"\n--- DOCX Embedded Image OCR {image_index} ---\n{ocr_text}\n")
@@ -583,6 +674,7 @@ async def _parse_docx_from_bytes(content: bytes) -> Tuple[str, List[str], Dict[s
         f"core_properties={sum(1 for value in core_properties.values() if value)} "
         f"custom_properties={len(custom_properties)} "
         f"fallback_images_extracted={len(base64_images)} "
+        f"image_bytes_total={image_bytes_total} "
         f"ocr_blocks={ocr_blocks} "
         f"text_chars={len(text)}"
     )
@@ -601,6 +693,8 @@ async def _parse_pptx_from_bytes(content: bytes) -> Tuple[str, List[str]]:
     prs = Presentation(io.BytesIO(content))
     text = ""
     base64_images = []
+    image_bytes_total = 0
+    ocr_blocks = 0
 
     for i, slide in enumerate(prs.slides):
         text += f"\n--- Slide {i+1} ---\n"
@@ -611,13 +705,12 @@ async def _parse_pptx_from_bytes(content: bytes) -> Tuple[str, List[str]]:
                 try:
                     img_bytes = shape.image.blob
                     img = Image.open(io.BytesIO(img_bytes))
-                    buffered = io.BytesIO()
-                    if img.mode in ("RGBA", "P"): img = img.convert("RGB")
-                    img.save(buffered, format="JPEG")
-                    img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                    normalized_img, img_b64, image_bytes = _prepare_image_for_model(img)
                     base64_images.append(img_b64)
-                    ocr_text = pytesseract.image_to_string(img)
+                    image_bytes_total += image_bytes
+                    ocr_text = await asyncio.to_thread(pytesseract.image_to_string, normalized_img)
                     if ocr_text.strip():
+                        ocr_blocks += 1
                         text += f"\n[Embedded Image OCR]: {ocr_text}\n"
                 except Exception as e:
                     logger.error(f"Failed to process image on slide {i+1}: {e}")
@@ -626,6 +719,14 @@ async def _parse_pptx_from_bytes(content: bytes) -> Tuple[str, List[str]]:
             if notes.strip():
                 text += f"\n[Speaker Notes]:\n{notes}\n"
 
+    logger.info(
+        "PPTX parse stats: "
+        f"slides={len(prs.slides)} "
+        f"images_extracted={len(base64_images)} "
+        f"image_bytes_total={image_bytes_total} "
+        f"ocr_blocks={ocr_blocks} "
+        f"text_chars={len(text)}"
+    )
     return text, base64_images
 
 async def _parse_excel_from_bytes(content: bytes, filename: str) -> str:

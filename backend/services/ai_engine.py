@@ -15,7 +15,7 @@ import tiktoken
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
-DETERMINISTIC_PROFILE_VERSION = "det_profile_v2"
+DETERMINISTIC_PROFILE_VERSION = "det_profile_v3"
 
 
 def _is_truthy_env(value: str) -> bool:
@@ -99,18 +99,38 @@ def chunk_text(text: str, max_tokens: int = MAX_TOKENS) -> List[str]:
         max_tokens = MAX_TOKENS
 
     words = text.split()
+    if not words:
+        return []
+
+    overlap_words = max(0, _safe_int_env("LLM_CHUNK_OVERLAP_WORDS", 120))
     chunks = []
-    current = []
-    
-    for word in words:
-        current.append(word)
-        if count_tokens(" ".join(current)) > max_tokens:
-            chunks.append(" ".join(current[:-1]))
-            current = [word]
-    
-    if current:
+    start = 0
+
+    while start < len(words):
+        current = []
+        end = start
+
+        while end < len(words):
+            current.append(words[end])
+            if count_tokens(" ".join(current)) > max_tokens:
+                if len(current) == 1:
+                    end += 1
+                    break
+                current.pop()
+                break
+            end += 1
+
+        if not current:
+            current = [words[start]]
+            end = start + 1
+
         chunks.append(" ".join(current))
-    
+        if end >= len(words):
+            break
+
+        next_start = max(end - overlap_words, start + 1)
+        start = next_start
+
     return chunks
 
 # Retry wrapper for LLM calls
@@ -130,6 +150,39 @@ async def call_with_retry(chain, messages, retries: int = 3):
             delay *= 2  # Exponential backoff
     
     return {"error": "Unexpected retry loop exit", "checklist": [], "suggestions": []}
+
+
+async def invoke_with_retry_raising(chain, messages, retries: int = 3):
+    """Call LLM with retries and re-raise the final exception."""
+    delay = 2
+
+    for attempt in range(retries):
+        try:
+            return await chain.ainvoke(messages)
+        except Exception as exc:
+            logger.warning(f"LLM call failed (attempt {attempt + 1}/{retries}): {str(exc)}")
+            if attempt == retries - 1:
+                logger.error(f"All {retries} retry attempts failed")
+                raise
+            await asyncio.sleep(delay)
+            delay *= 2
+
+
+def _looks_like_image_payload_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    indicators = [
+        "image",
+        "vision",
+        "multimodal",
+        "image_url",
+        "unsupported content",
+        "does not support",
+        "payload too large",
+        "request too large",
+        "413",
+        "content type",
+    ]
+    return any(indicator in message for indicator in indicators)
 
 class AIEngine:
     """Engine for interacting with various AI providers (OpenAI, Ollama, Gemini)."""
@@ -331,6 +384,28 @@ class AIEngine:
             
             checklist_context = "\nTarget Checklist exactly to follow:\n" + json.dumps(target_checklist, indent=2)
 
+        expected_checklist_entries: List[Dict[str, str]] = []
+        expected_key_order: Dict[tuple[str, str], int] = {}
+        for index, checklist_item in enumerate(target_checklist):
+            section = str(
+                checklist_item.get("Section")
+                or checklist_item.get("section")
+                or "General"
+            )
+            item_text = str(
+                checklist_item.get("ChecklistItem")
+                or checklist_item.get("checklist_item")
+                or checklist_item.get("Unnamed: 1")
+                or ""
+            )
+            if not item_text:
+                continue
+            expected_checklist_entries.append({
+                "section": section,
+                "item": item_text
+            })
+            expected_key_order[(section, item_text)] = index
+
         # Determine reference format based on file type
         reference_format = "Section"  # Default
         reference_enabled = True  # Whether to include location references at all
@@ -435,15 +510,24 @@ class AIEngine:
         - If evidence is weak or partial, use "Warning" instead of "Pass".
         - If no evidence is present, use "Fail".
         - Treat synonym labels as equivalent signals when evaluating evidence, including: `author`, `authors`, `document author`; `approver`, `approved by`; `revision history`, `change history`, `version history`; `version`, `document version`, `rev`.
+        - A heading or label alone is never enough to pass a checklist item. Example: a heading like `Workflow Diagram`, `Process Flow`, `Architecture Diagram`, or `Screenshot` does NOT count as the artifact itself.
+        - This document may be split across multiple chunks. If the current chunk contains no relevant evidence for an item, use status exactly `Not Seen` for this chunk instead of `Fail`.
+        - Do not use `Fail` merely because the current chunk does not mention something. Use `Fail` only when the current chunk contains affirmative evidence that the requirement is missing, incorrect, placeholder-only, or contradicted.
 
-        4. **Multiple Requirements**: If a checklist item contains multiple requirements (e.g. "Benefits AND expected outcomes"), and the document only fulfills one of them (e.g. only benefits are found), you MUST mark the status as "Warning", explaining exactly which part is missing in the comment, and providing the location reference for the partial find (if applicable per rule 2).
+        4. **Visual Artifact Rules**:
+        - For checklist items that require process flows, diagrams, screenshots, wireframes, charts, or other visuals, require evidence of an actual visual artifact.
+        - Acceptable evidence can come from attached page images, OCR text showing diagram labels inside a real visual, or parsed visual metadata markers such as `--- Page X Visual Metadata ---`.
+        - If the page only contains prose, bullets, or a heading that mentions a diagram but no actual visual artifact is evident, mark "Fail" or "Warning", not "Pass".
+        - Do not infer that a diagram exists purely because the section title suggests one should exist.
 
-        5. **Referenced Requirements Interpretation**:
+        5. **Multiple Requirements**: If a checklist item contains multiple requirements (e.g. "Benefits AND expected outcomes"), and the document only fulfills one of them (e.g. only benefits are found), you MUST mark the status as "Warning", explaining exactly which part is missing in the comment, and providing the location reference for the partial find (if applicable per rule 2).
+
+        6. **Referenced Requirements Interpretation**:
         - "Referenced" can mean explicit textual traceability such as section IDs, requirement IDs, BRD references, "refer to" statements, links, or explicit mappings.
         - If only generic statements are present without traceability detail, mark as "Warning".
 
-        6. **Parsed Marker Awareness**:
-        - Parsed content may include markers such as `--- Page X Text ---`, `--- Page X Tables ---`, `--- DOCX Table N ---`, `--- DOCX Header Section N ---`, `--- DOCX Core Properties ---`, and OCR markers.
+        7. **Parsed Marker Awareness**:
+        - Parsed content may include markers such as `--- Page X Text ---`, `--- Page X Tables ---`, `--- Page X Visual Metadata ---`, `--- DOCX Table N ---`, `--- DOCX Header Section N ---`, `--- DOCX Core Properties ---`, and OCR markers.
         - Use these markers for evidence and references. Never invent references outside provided markers.
 
         You must output a JSON object with the following structure:
@@ -534,16 +618,20 @@ class AIEngine:
             )
             AIEngine._vision_disabled_warning_logged = True
 
+        image_chars_total = sum(len(image) for image in images)
         images_sent_total = sum(len(batch) for batch in chunk_image_batches)
+        image_chars_sent = sum(len(image) for batch in chunk_image_batches for image in batch)
         logger.info(
             "Vision routing: "
             f"provider_model={self.provider}/{self.model_name} "
             f"vision_mode={self.vision_mode} "
             f"vision_enabled={supports_vision} "
             f"images_received={len(images)} "
+            f"image_chars_total={image_chars_total} "
             f"image_batches={len(image_batches)} "
             f"max_images_per_request={self.vision_max_images_per_request} "
             f"images_sent={images_sent_total} "
+            f"image_chars_sent={image_chars_sent} "
             f"chunks={len(chunks)}"
         )
         logger.info(f"Total chunks to process: {len(chunks)}")
@@ -576,6 +664,12 @@ Custom Instructions: {custom_instructions}
 Document Content (Part {chunk_index+1}):
 {chunk_data['content']}"""
 
+                chain = self.llm | self.parser
+                text_only_messages = [
+                    SystemMessage(content=system_msg_content),
+                    HumanMessage(content=user_content)
+                ]
+
                 if image_batch and supports_vision:
                     user_content_obj = [{"type": "text", "text": user_content}]
                     for img_b64 in image_batch:
@@ -583,19 +677,26 @@ Document Content (Part {chunk_index+1}):
                             "type": "image_url",
                             "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
                         })
-                    messages = [
+                    vision_messages = [
                         SystemMessage(content=system_msg_content),
                         HumanMessage(content=user_content_obj)
                     ]
-                else:
-                    messages = [
-                        SystemMessage(content=system_msg_content),
-                        HumanMessage(content=user_content)
-                    ]
 
-                chain = self.llm | self.parser
-                # Use retry wrapper
-                return await call_with_retry(chain, messages)
+                    try:
+                        return await invoke_with_retry_raising(chain, vision_messages)
+                    except Exception as exc:
+                        if _looks_like_image_payload_error(exc):
+                            logger.warning(
+                                "Vision payload rejected; retrying chunk without images. "
+                                f"provider_model={self.provider}/{self.model_name} "
+                                f"chunk={chunk_index + 1} "
+                                f"image_batch_size={len(image_batch)} "
+                                f"error={str(exc)}"
+                            )
+                            return await call_with_retry(chain, text_only_messages)
+                        raise
+
+                return await call_with_retry(chain, text_only_messages)
 
         try:
             semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
@@ -605,51 +706,171 @@ Document Content (Part {chunk_index+1}):
             ]
             results = await asyncio.gather(*tasks)
             
-            # Merge results
-            merged_checklist = {}
-            merged_suggestions = []
-            
+            def normalize_review_status(raw_status: Any) -> str:
+                status = str(raw_status or "").strip().lower()
+                if not status:
+                    return "not_seen"
+                if "not applicable" in status or status in {"n/a", "na"}:
+                    return "na"
+                if "not seen" in status:
+                    return "not_seen"
+                if "warning" in status:
+                    return "warning"
+                if "fail" in status:
+                    return "fail"
+                if "pass" in status:
+                    return "pass"
+                return "not_seen"
+
+            def format_review_status(normalized_status: str) -> str:
+                if normalized_status == "pass":
+                    return "Pass"
+                if normalized_status == "warning":
+                    return "Warning"
+                if normalized_status == "fail":
+                    return "Fail"
+                if normalized_status == "na":
+                    return "Not Applicable"
+                return "Not Seen"
+
+            def append_unique_comment(target: List[str], value: Any) -> None:
+                comment = str(value or "").strip()
+                if comment and comment not in target:
+                    target.append(comment)
+
+            def finalize_document_status(statuses: List[str]) -> str:
+                meaningful_statuses = {status for status in statuses if status not in {"not_seen", "na"}}
+                if "pass" in meaningful_statuses:
+                    if meaningful_statuses == {"pass"}:
+                        return "pass"
+                    return "warning"
+                if "warning" in meaningful_statuses:
+                    return "warning"
+                if "fail" in meaningful_statuses:
+                    return "fail"
+                if "na" in statuses:
+                    return "na"
+                return "fail"
+
+            def build_merged_comment(final_status: str, comments_by_status: Dict[str, List[str]]) -> str:
+                combined_comments: List[str] = []
+
+                if final_status == "pass":
+                    status_order = ["pass", "warning", "fail"]
+                elif final_status == "warning":
+                    status_order = ["warning", "fail", "pass"]
+                elif final_status == "fail":
+                    status_order = ["fail", "warning", "pass"]
+                else:
+                    status_order = ["na", "pass", "warning", "fail"]
+
+                for status_name in status_order:
+                    for comment in comments_by_status.get(status_name, []):
+                        append_unique_comment(combined_comments, comment)
+
+                if (
+                    final_status == "warning"
+                    and comments_by_status.get("pass")
+                    and (comments_by_status.get("warning") or comments_by_status.get("fail"))
+                ):
+                    combined_comments.insert(
+                        0,
+                        "Conflicting chunk-level findings were returned. Evidence was found in at least one chunk, but other chunks raised concerns."
+                    )
+
+                if combined_comments:
+                    return "\n".join(combined_comments)
+                if final_status == "fail":
+                    return "No supporting evidence was found anywhere in the analyzed document."
+                if final_status == "warning":
+                    return "Evidence is partial or conflicting across the analyzed document."
+                if final_status == "na":
+                    return "This item appears not applicable to the analyzed document."
+                return "Supporting evidence was found in the analyzed document."
+
+            def checklist_sort_key(item: Dict[str, Any]) -> tuple[int, int, str, str]:
+                key = (str(item.get("section", "")), str(item.get("item", "")))
+                expected_index = expected_key_order.get(key)
+                if expected_index is not None:
+                    return (0, expected_index, key[0], key[1])
+                return (1, math.inf, key[0], key[1])
+
+            merged_checklist: Dict[tuple[str, str], Dict[str, Any]] = {}
+            merged_item_state: Dict[tuple[str, str], Dict[str, Any]] = {}
+
+            def ensure_item_bucket(
+                section: str,
+                item_text: str,
+                template: Optional[Dict[str, Any]] = None,
+            ) -> tuple[str, str]:
+                key = (section, item_text)
+                if key not in merged_checklist:
+                    base_item = dict(template) if template else {}
+                    base_item["section"] = section
+                    base_item["item"] = item_text
+                    merged_checklist[key] = base_item
+                    merged_item_state[key] = {
+                        "statuses": [],
+                        "comments_by_status": {
+                            "pass": [],
+                            "warning": [],
+                            "fail": [],
+                            "na": [],
+                            "not_seen": [],
+                        },
+                    }
+                return key
+
+            for expected_item in expected_checklist_entries:
+                ensure_item_bucket(expected_item["section"], expected_item["item"])
+
             for res in results:
-                # Merge suggestions
-                if "suggestions" in res:
-                    merged_suggestions.extend(res["suggestions"])
-                
-                # Merge checklist with pessimistic conflict resolution (Fail > Warning > Pass)
                 for item in res.get("checklist", []):
-                    key = (item.get("section", ""), item.get("item", ""))
-                    current_status = item.get("status", "").lower()
-                    
-                    if key not in merged_checklist:
-                        merged_checklist[key] = item
-                    else:
-                        existing_status = merged_checklist[key].get("status", "").lower()
-                        # Upgrade severity if needed
-                        if "fail" in current_status:
-                            merged_checklist[key]["status"] = "Fail"
-                            if "fail" not in existing_status:
-                                merged_checklist[key]["comment"] = item.get("comment", "")
-                            else:
-                                merged_checklist[key]["comment"] += "\n" + item.get("comment", "")
-                        elif "warning" in current_status and "fail" not in existing_status:
-                            merged_checklist[key]["status"] = "Warning"
-                            if "warning" not in existing_status:
-                                merged_checklist[key]["comment"] = item.get("comment", "")
-                            else:
-                                merged_checklist[key]["comment"] += "\n" + item.get("comment", "")
-                        else:
-                            # Both Pass or N/A, just append comment if unique
-                            if item.get("comment") and item.get("comment") not in merged_checklist[key].get("comment", ""):
-                                merged_checklist[key]["comment"] += "\n" + item.get('comment', "")
+                    section = str(item.get("section") or "General")
+                    item_text = str(item.get("item") or "").strip()
+                    if not item_text:
+                        continue
 
-            checklist_items = list(merged_checklist.values())
-            checklist_items.sort(key=lambda i: (str(i.get("section", "")), str(i.get("item", ""))))
+                    key = ensure_item_bucket(section, item_text, item)
+                    normalized_status = normalize_review_status(item.get("status"))
+                    merged_item_state[key]["statuses"].append(normalized_status)
+                    append_unique_comment(
+                        merged_item_state[key]["comments_by_status"][normalized_status],
+                        item.get("comment", ""),
+                    )
 
-            def suggestion_sort_key(suggestion: Any) -> tuple[str, str]:
-                if isinstance(suggestion, dict):
-                    return (str(suggestion.get("type", "")), str(suggestion.get("text", "")))
-                return ("", str(suggestion))
+            checklist_items: List[Dict[str, Any]] = []
+            for key, merged_item in merged_checklist.items():
+                state = merged_item_state.get(key, {
+                    "statuses": [],
+                    "comments_by_status": {"pass": [], "warning": [], "fail": [], "na": [], "not_seen": []},
+                })
+                final_status = finalize_document_status(state["statuses"])
+                merged_item["status"] = format_review_status(final_status)
+                merged_item["comment"] = build_merged_comment(final_status, state["comments_by_status"])
+                checklist_items.append(merged_item)
 
-            merged_suggestions.sort(key=suggestion_sort_key)
+            checklist_items.sort(key=checklist_sort_key)
+
+            merged_suggestions_map: Dict[tuple[str, str], Dict[str, str]] = {}
+            for item in checklist_items:
+                normalized_status = normalize_review_status(item.get("status"))
+                if normalized_status not in {"warning", "fail"}:
+                    continue
+                suggestion_text = str(item.get("comment") or "").strip()
+                item_text = str(item.get("item") or "").strip()
+                if not suggestion_text:
+                    suggestion_text = f"Review '{item_text}' and add explicit supporting evidence in the document."
+                elif item_text and item_text.lower() not in suggestion_text.lower():
+                    suggestion_text = f"{item_text}: {suggestion_text}"
+                suggestion = {
+                    "type": format_review_status(normalized_status),
+                    "text": suggestion_text,
+                }
+                merged_suggestions_map[(suggestion["type"], suggestion["text"])] = suggestion
+
+            merged_suggestions = list(merged_suggestions_map.values())
+            merged_suggestions.sort(key=lambda suggestion: (suggestion["type"], suggestion["text"]))
 
             final_response = {
                 "checklist": checklist_items,
@@ -666,7 +887,7 @@ Document Content (Part {chunk_index+1}):
 
             for item in final_response.get("checklist", []):
                 status = str(item.get("status", "")).lower()
-                if "not applicable" in status or "n/a" in status:
+                if "not applicable" in status or "n/a" in status or "not seen" in status:
                     continue # Skip these entirely from the calculation
 
                 valid_items += 1

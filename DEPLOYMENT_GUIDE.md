@@ -24,12 +24,29 @@ sudo apt install -y tesseract-ocr poppler-utils
 sudo apt install -y libreoffice libreoffice-writer fonts-liberation fonts-dejavu-core
 ```
 
-Optional (for closer Microsoft Office layout parity in converted DOCX pagination):
+Optional: Microsoft Font Compatibility (Critical for DOCX accuracy)
+
+To achieve near-perfect parity with Microsoft Office layout and pagination, the server must have the relevant fonts installed. Without them, LibreOffice will substitute fonts, which can shift page breaks.
+
+**Linux (Ubuntu/Debian):**
 ```bash
-sudo apt install -y ttf-mscorefonts-installer
+# 1. Install core Microsoft fonts (Arial, Times New Roman, etc.)
+sudo apt update && sudo apt install -y ttf-mscorefonts-installer
+
+# 2. Install metric-compatible fonts for Calibri/Cambria (Essential for modern DOCX)
+sudo apt install -y fonts-crosextra-carlito fonts-crosextra-caladea
+
+# 3. Refresh system font cache
+sudo fc-cache -f -v
 ```
 
-*Note: If `tesseract-ocr` and `poppler-utils` are not installed, the application will not crash, but it will be physically unable to read images embedded inside uploaded documents. If `libreoffice` is missing, DOCX page-number references will be disabled.*
+**Windows (Local or Server Core):**
+1. Copy `.ttf` font files from `C:\Windows\Fonts` on a standard Windows desktop.
+2. Transfer them to the server and right-click -> **"Install for all users"**.
+3. Restart the backend service to ensure LibreOffice refreshes its internal font map.
+
+*Note: If `tesseract-ocr` and `poppler-utils` are not installed, the application will not crash, but it will be unable to process diagrams or scanned text. If `libreoffice` is missing, DOCX page-accurate references will be disabled.*
+
 
 ---
 
@@ -81,11 +98,16 @@ LLM_VISION_MODE=auto
 LLM_VISION_MODEL_ALLOWLIST="gpt-4o,gpt-4.1,gemini-1.5,gemini-2.0,gemini-2.5,llava,vision"
 LLM_VISION_MODEL_BLOCKLIST=""
 LLM_VISION_MAX_IMAGES_PER_REQUEST=6
+LLM_CHUNK_OVERLAP_WORDS=120
+VISION_IMAGE_MAX_DIM=1600
+VISION_IMAGE_JPEG_QUALITY=80
 
 # OCR extraction policy for PDF page images
 PDF_OCR_MODE=always
 PDF_OCR_MIN_TEXT_CHARS_PER_PAGE=120
 PDF_OCR_MAX_PAGES=100
+PDF_RENDER_DPI=160
+PDF_OCR_VISUAL_OBJECT_THRESHOLD=8
 ```
 
 ---
