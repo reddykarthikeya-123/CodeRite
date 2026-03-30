@@ -43,11 +43,11 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       const allCheckIds = new Set<string>();
-      checklistItems.forEach((item) => {
+      checklistItems.forEach((item, index) => {
         // Support both new format (ChecklistItem) and old format (Unnamed: 1, checklist_item)
         const checkText = (item.ChecklistItem || item.checklist_item || item['Unnamed: 1']) as string;
         // Use the original index from the API response
-        const originalIndex = item.index ?? 0;
+        const originalIndex = item.index ?? index;
         if (checkText && checkText !== 'Checklist Item') {
           allCheckIds.add(`${originalIndex}-${checkText}`);
         }
@@ -118,11 +118,11 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
     console.log('[selectAll] Called');
     const allCheckIds = new Set<string>();
     Object.values(filteredSections).forEach(items => {
-      items.forEach((item) => {
+      items.forEach((item, index) => {
         // Support both new and old field names
         const checkText = (item.ChecklistItem || item.checklist_item || item['Unnamed: 1']) as string;
         // Use the original index from the API response
-        const originalIndex = item.index ?? 0;
+        const originalIndex = item.index ?? index;
         if (checkText && checkText !== 'Checklist Item') {
           allCheckIds.add(`${originalIndex}-${checkText}`);
         }
@@ -241,10 +241,10 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
                     const checkText = (item.ChecklistItem || item.checklist_item || item['Unnamed: 1']) as string;
                     return checkText && checkText !== 'Checklist Item';
                   })
-                  .map((item) => {
+                  .map((item, index) => {
                     const checkText = (item.ChecklistItem || item.checklist_item || item['Unnamed: 1']) as string;
                     // Get the original index from the API response
-                    const originalIndex = item.index ?? 0;
+                    const originalIndex = item.index ?? index;
                     return `${originalIndex}-${checkText}`;
                   });
                 
@@ -319,11 +319,11 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
                           className="overflow-hidden"
                         >
                           <div className="p-4 space-y-2 border-t border-slate-100">
-                            {items.map((item) => {
+                            {items.map((item, index) => {
                               // Support both new format (ChecklistItem) and old format (Unnamed: 1, checklist_item)
                               const checkText = (item.ChecklistItem || item.checklist_item || item['Unnamed: 1']) as string;
                               // Get the original index from the API response
-                              const originalIndex = item.index ?? 0;
+                              const originalIndex = item.index ?? index;
                               if (!checkText || checkText === 'Checklist Item') return null;
 
                               const checkId = `${originalIndex}-${checkText}`;
@@ -335,12 +335,21 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
                                   initial={{ opacity: 0, x: -10 }}
                                   animate={{ opacity: 1, x: 0 }}
                                   transition={{ delay: originalIndex * 0.02 }}
-                                  className={`flex items-start gap-3 p-3 rounded-lg transition-colors cursor-pointer ${
+                                  className={`flex items-start gap-3 p-3 rounded-lg transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1E40AF] focus:ring-opacity-50 ${
                                     isSelected
                                       ? 'bg-[#1E40AF]/5 hover:bg-[#1E40AF]/10'
                                       : 'bg-slate-50 hover:bg-slate-100'
                                   }`}
                                   onClick={() => toggleCheck(checkId)}
+                                  role="checkbox"
+                                  aria-checked={isSelected}
+                                  tabIndex={0}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      toggleCheck(checkId);
+                                    }
+                                  }}
                                 >
                                   <div
                                     className={`w-5 h-5 rounded flex-shrink-0 flex items-center justify-center border transition-colors mt-0.5 ${

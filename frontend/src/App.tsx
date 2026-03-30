@@ -20,6 +20,8 @@ function App() {
   // Upload state
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [loadingChecklist, setLoadingChecklist] = useState(false);
+  const [retryAction, setRetryAction] = useState<{ label: string, onClick: () => void } | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [categories, setCategories] = useState<string[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -141,6 +143,12 @@ function App() {
 
   const handleFileUpload = async (file: File, category: string) => {
     console.log('[handleFileUpload] Starting...', { file: file.name, category });
+
+    setUploadError(null);
+    setRetryAction(null);
+    setLoadingChecklist(true);
+    setPendingFile({ file, category });
+
     // Fetch checklist items and show filter modal
     try {
       console.log('[handleFileUpload] Fetching checklist items...');
@@ -153,13 +161,17 @@ function App() {
       }));
       console.log('[handleFileUpload] Setting state...');
       setChecklistItems(itemsWithOriginal);
-      setPendingFile({ file, category });
       setShowChecklistFilter(true);
       console.log('[handleFileUpload] Modal should be open now');
     } catch (err) {
       console.error('[handleFileUpload] Error:', err);
-      setUploadError("Failed to load checklist items. Please try again.");
-      setTimeout(() => setUploadError(null), 5000);
+      setUploadError("Failed to load checklist items. Please check your network connection.");
+      setRetryAction({
+        label: "Retry",
+        onClick: () => handleFileUpload(file, category)
+      });
+    } finally {
+      setLoadingChecklist(false);
     }
   };
 
@@ -174,14 +186,17 @@ function App() {
       const fileType = file.name.split('.').pop()?.toLowerCase() || '';
 
       // Show loading immediately before async upload starts
-      setCurrentFile({ content: '', filename: file.name });
       setUploading(true);
+      setUploadError(null);
+      setRetryAction(null);
 
       // Read file and upload
       const { uploadFile } = await import('./api');
       uploadFile(file)
         .then(data => {
           console.log('[handleChecklistApply] File uploaded, sending to analyze with', selectedChecks.length, 'checks');
+          setPendingFile(null); // clear only on success so retry still has the file
+          setCurrentFile({ content: '', filename: file.name }); // Bug #3 fix: Only set currentFile AFTER upload succeeds
           handleFileProcessed(
             data.text,
             data.filename || file.name,
@@ -194,12 +209,12 @@ function App() {
         })
         .catch(err => {
           console.error('Upload error:', err);
-          setUploadError(`Upload Failed: ${err instanceof Error ? err.message : String(err)}`);
+          setUploadError(`Upload failed: ${err instanceof Error ? err.message : String(err)}`);
           setUploading(false);
-          setCurrentFile(null);
-        })
-        .finally(() => {
-          setPendingFile(null);
+          setRetryAction({
+            label: "Retry Upload",
+            onClick: () => handleChecklistApply(selectedChecks)
+          });
         });
     }
   };
@@ -370,6 +385,8 @@ function App() {
                             error={uploadError}
                             onErrorChange={setUploadError}
                             selectedCategory={selectedCategory}
+                            loadingChecklist={loadingChecklist}
+                            retryAction={retryAction}
                           />
                         </motion.div>
                       ) : (
@@ -610,6 +627,8 @@ interface FileUploadDropzoneProps {
   error: string | null;
   onErrorChange: (error: string | null) => void;
   selectedCategory: string;
+  loadingChecklist?: boolean;
+  retryAction?: { label: string, onClick: () => void } | null;
 }
 
 const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
@@ -618,6 +637,8 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
   error,
   onErrorChange,
   selectedCategory,
+  loadingChecklist,
+  retryAction,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -761,18 +782,27 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
               Embedded flowcharts and screenshots are automatically graded via AI Vision.
             </p>
 
-            {/* Disabled overlay message */}
-            {isDisabled && (
+            {/* Disabled or Loading overlay message */}
+            {(isDisabled || loadingChecklist) && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-2xl z-20"
               >
                 <div className="bg-white px-6 py-3 rounded-xl shadow-lg border-2 border-slate-200 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  <span className="text-sm font-semibold text-slate-600">Select a framework to enable upload</span>
+                  {loadingChecklist ? (
+                    <>
+                      <Loader2 className="w-5 h-5 text-[#3B82F6] animate-spin" />
+                      <span className="text-sm font-semibold text-slate-600">Loading checklist items...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      <span className="text-sm font-semibold text-slate-600">Select a framework to enable upload</span>
+                    </>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -788,15 +818,26 @@ const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
             className="absolute top-0 left-0 right-0 z-50 p-4 pointer-events-none"
           >
-            <div className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4 shadow-lg flex items-start gap-3 pointer-events-auto">
-              <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
-              <p className="text-rose-800 text-sm font-medium flex-1">{error}</p>
-              <button
-                onClick={() => onErrorChange(null)}
-                className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-100 rounded-lg transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+            <div className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4 shadow-lg flex flex-col gap-2 pointer-events-auto min-w-[300px]">
+              <div className="flex items-start gap-3 w-full">
+                <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+                <p className="text-rose-800 text-sm font-medium flex-1">{error}</p>
+                <button
+                  onClick={() => onErrorChange(null)}
+                  className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-100 rounded-lg transition-colors flex-shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {retryAction && (
+                <button
+                  onClick={retryAction.onClick}
+                  className="self-end px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  {retryAction.label}
+                </button>
+              )}
             </div>
           </motion.div>
         )}
@@ -904,7 +945,12 @@ const CodeUploadDropzone: React.FC<CodeUploadDropzoneProps> = ({
   const handleSubmit = () => {
     if (activeTab === 'files' && selectedFiles.length > 0) {
       onCodeProcessed(selectedFiles.map(f => ({ filename: f.file.name, content: f.content })));
-    } else if (activeTab === 'paste' && pastedCode.trim()) {
+    } else if (activeTab === 'paste') {
+      if (pastedCode.trim().length < 10) {
+        onErrorChange("Please paste at least 10 characters of code before submitting.");
+        setTimeout(() => onErrorChange(null), 5000);
+        return;
+      }
       onCodeProcessed([{ filename: 'pasted_code.txt', content: pastedCode }]);
     }
   };

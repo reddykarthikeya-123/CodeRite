@@ -508,7 +508,7 @@ async def _parse_pdf_from_bytes(content: bytes) -> Tuple[str, List[str]]:
             if should_ocr and ocr_blocks < ocr_max_pages:
                 ocr_text = await asyncio.to_thread(pytesseract.image_to_string, img)
                 if ocr_text.strip():
-                    text_parts.append(f"\n--- OCR Page {i+1} ---\n{ocr_text}\n")
+                    text_parts.append(f"\n--- Page {i+1} OCR ---\n{ocr_text}\n")
                     ocr_blocks += 1
     except Exception as e:
         logger.warning(f"OCR/Vision warning on PDF: {e}")

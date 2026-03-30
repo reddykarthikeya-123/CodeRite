@@ -3,7 +3,7 @@ import type { ReviewResponse, ChecklistItem } from '../api';
 import { CheckCircle, XCircle, AlertTriangle, FileText, ChevronDown, ChevronUp, Edit3, ListChecks, Download, Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { motion, AnimatePresence, useSpring, useTransform, useMotionValue } from 'framer-motion';
+import { motion, AnimatePresence, useSpring, useTransform, useMotionValue, useReducedMotion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import clsx from 'clsx';
 
@@ -16,8 +16,9 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
     const [selectedFilters, setSelectedFilters] = useState<Set<string>>(new Set(['pass', 'fail', 'warning']));
 
     // Animated Score Logic
+    const prefersReducedMotion = useReducedMotion();
     const animatedScore = useMotionValue(0);
-    const springScore = useSpring(animatedScore, { duration: 2500, bounce: 0.2 });
+    const springScore = useSpring(animatedScore, prefersReducedMotion ? { duration: 0 } : { duration: 2500, bounce: 0.2 });
     const displayScore = useTransform(springScore, (latest) => Math.round(latest));
 
     useEffect(() => {
@@ -84,12 +85,18 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
         doc.setTextColor(71, 85, 105);
         doc.text(`Overall Score: ${result.score}/100`, 14, 32);
 
-        const tableData = result.checklist.map((item: ChecklistItem) => [
-            item.section || 'General',
-            item.item,
-            item.status,
-            item.comment || ''
-        ]);
+        const tableData = result.checklist.map((item: ChecklistItem) => {
+            let remarks = (item.comment || '').replace(/\[(Page|Slide|Section|Sheet)[^\]]*\]/g, '').trim();
+            if (item.status !== 'Fail' && item.page_references && item.page_references.length > 0) {
+                remarks = `[Loc: ${item.page_references.join(', ')}]\n\n${remarks}`;
+            }
+            return [
+                item.section || 'General',
+                item.item,
+                item.status,
+                remarks
+            ];
+        });
 
         autoTable(doc, {
             startY: 40,
@@ -98,6 +105,8 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
             theme: 'grid',
             headStyles: { fillColor: [79, 70, 229] },
             styles: { fontSize: 9, cellPadding: 3, overflow: 'linebreak' },
+            rowPageBreak: 'avoid',
+            margin: { top: 20, bottom: 20 },
             columnStyles: {
                 0: { cellWidth: 35 },
                 1: { cellWidth: 60 },
@@ -295,24 +304,19 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                                             <div className="flex-1 w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                                                 <div className="flex-1 max-w-xl">
                                                     <h5 className="font-bold text-slate-800 text-[15px] leading-snug">{item.item}</h5>
+                                                    {item.status !== 'Fail' && item.page_references && item.page_references.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1.5 mb-2">
+                                                            {item.page_references.map((ref: number, idx: number) => (
+                                                                <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-sm">
+                                                                    Loc: {ref}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                     {item.comment && (
-                                                        <p className="text-[14px] text-slate-600 mt-1.5 leading-relaxed">
-                                                            {/* Only show Page and Slide references for non-Fail items (exclude Section references) */}
-                                                            {item.status !== 'Fail' ? (
-                                                                item.comment.split(/(\[Page \d+\]|\[Slide \d+\])/g).map((part: string, index: number) => {
-                                                                    if (part.match(/\[Page \d+\]|\[Slide \d+\]/)) {
-                                                                        return (
-                                                                            <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 mr-1 shadow-sm">
-                                                                                {part.replace(/[\[\]]/g, '')}
-                                                                            </span>
-                                                                        );
-                                                                    }
-                                                                    return part;
-                                                                })
-                                                            ) : (
-                                                                // For Fail items, remove all references and show only the comment text
-                                                                item.comment.replace(/\[Page \d+\]|\[Slide \d+\]|\[Section \d+\]/g, '').trim()
-                                                            )}
+                                                        <p className="text-[14px] text-slate-600 leading-relaxed">
+                                                            {/* For all items, clean up any residual or hallucinated [Page X] tags from string */}
+                                                            {item.comment.replace(/\[(Page|Slide|Section|Sheet)[^\]]*\]/g, '').trim()}
                                                         </p>
                                                     )}
                                                 </div>

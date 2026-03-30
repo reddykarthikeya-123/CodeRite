@@ -50,11 +50,13 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
-// Helper function for fetch with timeout
+// Helper function for fetch with timeout, retries, and dynamic backoff
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
-  timeout = 60000
+  timeout = 60000,
+  retries = 2, // Default 2 retries
+  backoffMs = 2000
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -62,11 +64,30 @@ async function fetchWithTimeout(
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timeoutId);
+
+    // Auto-retry on 5xx server errors or 429 rate limits
+    if (!response.ok && (response.status >= 500 || response.status === 429) && retries > 0) {
+      console.warn(`[API] Server error ${response.status}. Retrying in ${backoffMs}ms... (${retries} retries left)`);
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+      return fetchWithTimeout(url, options, timeout, retries - 1, backoffMs * 2);
+    }
+
     return response;
   } catch (error) {
     clearTimeout(timeoutId);
+    
+    if (retries > 0) {
+      const isTimeout = error instanceof Error && error.name === "AbortError";
+      // Dynamic timeout: extend timeout by 1.5x on subsequent timeout failures
+      const nextTimeout = isTimeout ? Math.floor(timeout * 1.5) : timeout;
+      
+      console.warn(`[API] Network/Timeout error. Retrying in ${backoffMs}ms with ${nextTimeout}ms limit...`);
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+      return fetchWithTimeout(url, options, nextTimeout, retries - 1, backoffMs * 2);
+    }
+
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`Request timeout after ${timeout}ms`);
+      throw new Error(`Request timeout after ${timeout}ms. The server took too long to respond.`);
     }
     throw error;
   }
@@ -115,6 +136,15 @@ export const activateConnection = setActiveConnection;
 export const testConnection = async (id: number): Promise<{ success: boolean; message: string }> => {
   const response = await fetchWithTimeout(`${API_BASE_URL}/connections/${id}/test`, {
     method: "POST",
+  });
+  return handleResponse<{ success: boolean; message: string }>(response);
+};
+
+export const testConnectionPayload = async (conn: Connection): Promise<{ success: boolean; message: string }> => {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/connections/test`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(conn),
   });
   return handleResponse<{ success: boolean; message: string }>(response);
 };
@@ -179,7 +209,7 @@ export const analyzeDocument = async (
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-  }, 120000); // 2 minute timeout for analysis
+  }, 300000); // 5 minute timeout for analysis
 
   return handleResponse<ReviewResponse>(response);
 };
@@ -190,7 +220,7 @@ export const analyzeCode = async (files: { filename: string, content: string }[]
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-  }, 120000); // 2 minute timeout for analysis
+  }, 300000); // 5 minute timeout for analysis
   
   return handleResponse<CodeAnalysisResponse>(response);
 };

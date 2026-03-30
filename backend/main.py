@@ -448,6 +448,14 @@ async def analyze_document(request: Request, analysis_request: AnalysisRequest, 
                 detail="No active AI connection found. Please configure one in Settings."
             )
 
+        # Bug #2 guard: explicitly empty list means user deselected all items — reject it
+        # None is the accepted default meaning "use full checklist"
+        if analysis_request.enabled_checks is not None and len(analysis_request.enabled_checks) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="No checklist items selected. Please select at least one item before running the analysis."
+            )
+
         # Use API key directly
         api_key = ""
         if active_conn.api_key:

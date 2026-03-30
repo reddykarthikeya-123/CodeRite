@@ -12,6 +12,7 @@ export interface ChecklistItem {
   item: string;
   status: string;
   comment: string;
+  page_references?: number[];
 }
 
 export interface SuggestionItem {

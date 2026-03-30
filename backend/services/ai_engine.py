@@ -50,6 +50,7 @@ class ChecklistItem(BaseModel):
     item: str = Field(description="The checklist item being reviewed")
     status: str = Field(description="Status of the item: Pass, Fail, or Warning")
     comment: str = Field(description="Comment explaining the status")
+    page_references: Optional[List[int]] = Field(default=[], description="List of page, slide, or sheet numbers where evidence was found. Empty if none.")
 
 class SuggestionItem(BaseModel):
     type: str = Field(description="Type of suggestion: Fail or Warning")
@@ -485,8 +486,8 @@ class AIEngine:
         import re
         total_pages = 0
         if file_type and file_type.lower().strip('.') in ["pdf", "docx", "doc"] and reference_format == "Page":
-            # Page-based files have page markers in the format "--- Page X Text ---" or "--- Page X Tables ---"
-            page_matches = re.findall(r'--- Page (\d+) (?:Text|Tables) ---', text)
+            # Page-based files have page markers in the format "--- Page X Text ---", "--- Page X Tables ---", "--- Page X Visual Metadata ---", or "--- Page X OCR ---"
+            page_matches = re.findall(r'--- Page (\d+) (?:Text|Tables|Visual Metadata|OCR)?', text)
             if page_matches:
                 total_pages = max([int(p) for p in page_matches], default=0)
         elif file_type and file_type.lower().strip('.') in ["pptx", "ppt"]:
@@ -525,21 +526,16 @@ class AIEngine:
         if reference_enabled and reference_format:
             if reference_format == "Sheet":
                 reference_instructions = f"""2. **Location References - Conditional Rules**:
-   - **PASS items (status="Pass")**: ALWAYS include the sheet reference with specific evidence. Use format "[Sheet: SheetName]" (e.g., "[Sheet: Data]", "[Sheet: Summary]"). Example: "[Sheet: Data] Found title 'Project X' authored by John Doe" - you must prove you read the specific detail.
-   - **WARNING items (status="Warning")**: Include the sheet reference ONLY if partial content was found. Example: "[Sheet: Summary] Input defined but output missing..." If nothing exists to reference, omit the location.
-   - **FAIL items (status="Fail")**: Do NOT include any sheet reference when nothing was found. Simply explain what is missing. Example: "No process flows found" - NO sheet prefix needed since there's nothing to reference."""
+   - **PASS and WARNING items**: ALWAYS include the sheet number/string in the `page_references` array.
+   - **FAIL items**: Do NOT include any references in the `page_references` array. Leave it empty."""
             else:
-                reference_instructions = f"""2. **Location References - Conditional Rules**:
-   - **How to Find Page/Slide Numbers**: The document text contains page markers in the format "--- Page X Text ---", "--- Page X Tables ---", or "--- Slide X ---". To find the correct page number for any content:
-     1. Search for the content in the document text
-     2. Look backwards from that content to find the nearest "--- Page X Text ---", "--- Page X Tables ---", or "--- Slide X ---" marker
-     3. Use that X value as the page/slide number in your response (e.g., [Page X] or [Slide X])
-     4. **IMPORTANT**: This document has exactly **{total_pages} {reference_format}s** (numbered 1 to {total_pages}). All your page references MUST be between 1 and {total_pages}. If you can't find content within these pages, mark it as "Fail" without a page reference.
-   - **PASS items (status="Pass")**: ALWAYS include the {reference_format} reference with specific evidence extracted from the document. Example: "[{reference_format} 5] Found title 'Project X' authored by John Doe" - you must prove you read the specific detail.
-   - **WARNING items (status="Warning")**: Include the {reference_format} reference ONLY if partial content was found. Example: "[{reference_format} 13] Input defined but output missing..." If nothing exists to reference, omit the location.
-   - **FAIL items (status="Fail")**: Do NOT include any {reference_format} reference when nothing was found. Simply explain what is missing. Example: "No process flows found" - NO page prefix needed since there's nothing to reference."""
+                reference_instructions = f"""2. **Location References**:
+   - **How to Find Page/Slide Numbers**: Look for markers like "--- Page X Text ---", "--- Page X OCR ---", or "--- Slide X ---".
+   - **IMPORTANT**: This document has exactly **{total_pages} {reference_format}s** (numbered 1 to {total_pages}). All numbers in `page_references` MUST be between 1 and {total_pages}.
+   - **PASS and WARNING items**: ALWAYS include the relevant {reference_format} numbers in the `page_references` JSON array. Do not embed them in the comment.
+   - **FAIL items**: Leave the `page_references` array EMPTY []."""
         else:
-            reference_instructions = """2. **Location References**: Do NOT include page/sheet/slide references for this file type. Provide comments based on content evidence without location prefixes."""
+            reference_instructions = """2. **Location References**: Do NOT include references. Leave the `page_references` array EMPTY []."""
 
         # Build global context map if CAR archive
         global_context_map = ""
@@ -574,7 +570,7 @@ class AIEngine:
 
         3. **Evidence-First Decisioning**:
         - Do not mark any checklist item as "Pass" unless you can quote concrete evidence from the parsed content or provided images.
-        - For every checklist comment, include this structure in one sentence: `Evidence: <quoted snippet or 'None'> | Found: <what is present> | Missing: <what is missing or 'None'>`.
+        - For every checklist comment, include this structure: `Evidence: <quoted snippet or 'None'> | Found: <what is present> | Missing: <what is missing or 'None'>`.
         - If evidence is weak or partial, use "Warning" instead of "Pass".
         - If no evidence is present, use "Fail".
         - Treat synonym labels as equivalent signals when evaluating evidence, including: `author`, `authors`, `document author`; `approver`, `approved by`; `revision history`, `change history`, `version history`; `version`, `document version`, `rev`.
@@ -1061,22 +1057,30 @@ Custom Instructions: {custom_instructions}
         import re
         
         for item in response.get("checklist", []):
-            comment = item.get("comment", "")
-            if not comment:
-                continue
-                
-            # Find all [Page X] or [Slide X] references
-            pattern = rf'\[{reference_format} (\d+)\]'
-            matches = re.findall(pattern, comment)
+            page_refs = item.get("page_references", [])
+            if not isinstance(page_refs, list):
+                if isinstance(page_refs, (int, str)):
+                    # Attempt to standardize scalar values
+                    try:
+                        page_refs = [int(page_refs)]
+                    except Exception:
+                        page_refs = []
+                else:
+                    page_refs = []
+
+            valid_refs = []
+            for ref in page_refs:
+                try:
+                    page_num = int(ref)
+                    if 1 <= page_num <= total_pages:
+                        valid_refs.append(page_num)
+                    else:
+                        logger.warning(f"Removed invalid {reference_format.lower()} reference: {page_num} (document has {total_pages} {reference_format}s)")
+                except Exception:
+                    pass
             
-            for match in matches:
-                page_num = int(match)
-                if page_num > total_pages or page_num < 1:
-                    # Remove invalid reference
-                    comment = comment.replace(f'[{reference_format} {page_num}]', f'[{reference_format} reference removed - invalid]')
-                    logger.warning(f"Corrected invalid {reference_format.lower()} reference: {page_num} (document has {total_pages} {reference_format}s)")
-            
-            item["comment"] = comment
+            # De-duplicate and assign back
+            item["page_references"] = list(set(valid_refs))
             
         return response
 
@@ -1214,6 +1218,7 @@ Custom Instructions: {custom_instructions}
         1. Apply the user's selected suggestions accurately and completely to the source code.
         2. Verify that the updated code remains valid and runnable in its respective language.
         3. Do NOT include markdown code blocks (like ```python) surrounding the code string in your JSON response. The `fixed_code` value should strictly be raw code.
+        4. PRESERVE ALL ORIGINAL FORMATTING: You must strictly maintain the original indentation, whitespace, blank lines, and empty spaces. Do not auto-format, align, or restructure any code that is outside the scope of the requested suggestions.
 
         You must output a JSON object with the following exact structure:
         {{
@@ -1266,6 +1271,7 @@ Custom Instructions: {custom_instructions}
         1. Apply the user's selected suggestions accurately and completely to the source code for each file.
         2. Verify that the updated code remains valid and runnable.
         3. Do NOT include markdown code blocks (like ```python) surrounding the code strings in your JSON response. The `fixed_code` values should strictly be raw code.
+        4. PRESERVE ALL ORIGINAL FORMATTING: You must strictly maintain the original indentation, whitespace, blank lines, and empty spaces for each file. Do not auto-format, align, or restructure any code that is outside the scope of the requested suggestions.
 
         You must output a JSON object with the following exact structure:
         {
