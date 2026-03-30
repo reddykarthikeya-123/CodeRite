@@ -590,8 +590,13 @@ async def analyze_code(request: Request, code_request: CodeAnalysisRequest, db: 
                     from services.parser import _parse_car_from_bytes
                     b64_str = f.content.split('base64,')[1]
                     binary_content = base64.b64decode(b64_str)
-                    car_text, _ = await _parse_car_from_bytes(binary_content)
-                    f.content = car_text
+                    parsed_data = await _parse_car_from_bytes(binary_content)
+                    
+                    # Convert to text format
+                    text_parts = []
+                    for file_info in parsed_data["files"]: 
+                        text_parts.append(f"\n--- File: {file_info['filename']} ---\n{file_info['content']}")
+                    f.content = "\n".join(text_parts)
                 except Exception as e:
                     logger.error(f"Failed to process .car file {f.filename}: {e}")
                     raise HTTPException(status_code=400, detail=f"Failed to process archive '{f.filename}': {str(e)}")

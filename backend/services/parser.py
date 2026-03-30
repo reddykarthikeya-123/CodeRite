@@ -450,7 +450,7 @@ async def _parse_pdf_from_bytes(content: bytes) -> Tuple[str, List[str]]:
     ocr_mode = os.getenv("PDF_OCR_MODE", "always").strip().lower()
     if ocr_mode not in {"always", "auto", "off"}:
         ocr_mode = "always"
-    ocr_min_text_chars = _safe_int_env("PDF_OCR_MIN_TEXT_CHARS_PER_PAGE", 120)
+    ocr_min_text_chars = _safe_int_env("PDF_OCR_MIN_TEXT_CHARS_PER_PAGE", 50)
     ocr_max_pages = _safe_int_env("PDF_OCR_MAX_PAGES", 100)
     ocr_visual_object_threshold = max(1, _safe_int_env("PDF_OCR_VISUAL_OBJECT_THRESHOLD", 8))
     render_dpi = max(72, _safe_int_env("PDF_RENDER_DPI", 160))

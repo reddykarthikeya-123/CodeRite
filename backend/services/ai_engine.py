@@ -335,6 +335,39 @@ class AIEngine:
             logger.error(f"Connection test failed: {e}")
             raise Exception(f"{str(e)}")
 
+    def _generate_global_symbols_map(self, files: List[Dict[str, str]]) -> str:
+        """Generates a summary of files and key symbols (classes, functions, namespaces)
+        to provide global context for chunked analysis.
+        """
+        if not files:
+            return ""
+
+        import re
+        summary_parts = ["GLOBAL CONTEXT (The following files and symbols exist across the entire document/archive):"]
+        for f in files:
+            fname = f.get("filename", "unknown")
+            content = f.get("content", "")
+
+            # XML Elements (common in .car files)
+            xml_elements = re.findall(r'<([\w:-]+)', content[:5000])
+            unique_xml = sorted(list(set(xml_elements)))[:10]
+
+            # Code Classes & Functions
+            classes = re.findall(r'class\s+([\w\d_]+)', content)
+            funcs = re.findall(r'def\s+([\w\d_]+)', content)
+
+            file_summary = f"- File: {fname}"
+            if unique_xml:
+                file_summary += f" [XML Elements: {', '.join(unique_xml)}]"
+            if classes:
+                file_summary += f" [Classes: {', '.join(classes[:5])}]"
+            if funcs:
+                file_summary += f" [Functions: {', '.join(funcs[:5])}]"
+
+            summary_parts.append(file_summary)
+
+        return "\n".join(summary_parts) + "\n\n"
+
     async def analyze_document(
         self,
         text: str,
@@ -508,9 +541,22 @@ class AIEngine:
         else:
             reference_instructions = """2. **Location References**: Do NOT include page/sheet/slide references for this file type. Provide comments based on content evidence without location prefixes."""
 
+        # Build global context map if CAR archive
+        global_context_map = ""
+        if is_car_analysis:
+            import re as _re
+            _car_file_pattern = r'\n--- File: (.+?) ---\n'
+            _car_file_parts = _re.split(_car_file_pattern, text)
+            _file_infos = []
+            for _i in range(1, len(_car_file_parts), 2):
+                if _i + 1 < len(_car_file_parts):
+                    _file_infos.append({"filename": _car_file_parts[_i], "content": _car_file_parts[_i+1]})
+            global_context_map = self._generate_global_symbols_map(_file_infos)
+
         segmentation_instructions = (
-            """        - This input may be one segment of a multi-file or chunked document. If the current segment contains no relevant evidence for an item, use status exactly `Not Seen` for this segment instead of `Fail`.
-        - Do not use `Fail` merely because the current segment does not mention something. Use `Fail` only when the current segment contains affirmative evidence that the requirement is missing, incorrect, placeholder-only, or contradicted."""
+            f"""        - This input may be one segment of a multi-file or chunked document. If the current segment contains no relevant evidence for an item, use status exactly `Not Seen` for this segment instead of `Fail`.
+        - Do not use `Fail` merely because the current segment does not mention something. Use `Fail` only when the current segment contains affirmative evidence that the requirement is missing, incorrect, placeholder-only, or contradicted.
+        {global_context_map}"""
             if is_car_analysis else
             """        - The full document is provided in this call. Do not use status `Not Seen`.
         - Every checklist item in this call must resolve to `Pass`, `Warning`, `Fail`, or `Not Applicable` using the full document context."""
