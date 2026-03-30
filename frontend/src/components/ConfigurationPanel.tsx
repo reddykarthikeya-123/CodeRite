@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { fetchConnections, createConnection, updateConnection, activateConnection, deleteConnection, type Connection } from '../api';
-import { Settings, Save, Plus, Trash2, CheckCircle2, Circle, Loader2 } from 'lucide-react';
+import { fetchConnections, createConnection, updateConnection, activateConnection, deleteConnection, testConnection, testConnectionPayload, type Connection } from '../api';
+import { Settings, Save, Plus, Trash2, CheckCircle2, Circle, Loader2, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 
@@ -9,6 +9,7 @@ export const ConfigurationPanel: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
+    const [isTestingOnly, setIsTestingOnly] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
 
     // Empty defaults as requested
@@ -35,6 +36,28 @@ export const ConfigurationPanel: React.FC = () => {
         loadConnections();
     }, []);
 
+    const handleTestOnly = async () => {
+        if (!newConn.name || !newConn.model_name) {
+            alert("Name and Model Name are required.");
+            return;
+        }
+
+        setIsTestingOnly(true);
+        try {
+            const testRes = await testConnectionPayload(newConn);
+            if (testRes.success) {
+                alert("✅ Connection test successful!");
+            } else {
+                alert(`❌ Connection test failed: ${testRes.message}`);
+            }
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            alert(`❌ Connection test failed: ${errorMessage}`);
+        } finally {
+            setIsTestingOnly(false);
+        }
+    };
+
     const handleSaveNew = async () => {
         if (!newConn.name || !newConn.model_name) {
             alert("Name and Model Name are required.");
@@ -58,8 +81,28 @@ export const ConfigurationPanel: React.FC = () => {
         try {
             if (editingId) {
                 await updateConnection(editingId, newConn);
+                try {
+                    const testRes = await testConnection(editingId);
+                    if (!testRes.success) {
+                        alert(`Connection saved, but API test failed: ${testRes.message}`);
+                    }
+                } catch {
+                    alert(`Connection saved, but API test failed.`);
+                }
             } else {
                 await createConnection(newConn);
+                const updatedList = await fetchConnections();
+                const created = updatedList.find(c => c.name === newConn.name);
+                if (created && created.id) {
+                    try {
+                        const testRes = await testConnection(created.id);
+                        if (!testRes.success) {
+                            alert(`Connection saved, but API test failed: ${testRes.message}`);
+                        }
+                    } catch {
+                        alert(`Connection saved, but API test failed.`);
+                    }
+                }
             }
             setIsAdding(false);
             setEditingId(null);
@@ -84,11 +127,25 @@ export const ConfigurationPanel: React.FC = () => {
         await loadConnections();
     };
 
-    const handleDelete = async (id: number) => {
-        if (confirm("Are you sure you want to delete this connection?")) {
-            await deleteConnection(id);
-            await loadConnections();
+    const handleDelete = async (conn: Connection) => {
+        if (!conn.id) return;
+        if (conn.is_active) {
+            if (!confirm("This is the active connection. Deleting it will disable AI features until another is activated. Are you sure?")) {
+                return;
+            }
+        } else {
+            if (!confirm("Are you sure you want to delete this connection?")) {
+                return;
+            }
         }
+        
+        await deleteConnection(conn.id);
+        const remaining = await fetchConnections();
+        if (conn.is_active && remaining.length > 0) {
+            const firstId = remaining[0].id;
+            if (firstId) await activateConnection(firstId);
+        }
+        await loadConnections();
     };
 
     if (loading && connections.length === 0) {
@@ -168,7 +225,7 @@ export const ConfigurationPanel: React.FC = () => {
                                 <Settings className="w-4 h-4" />
                             </button>
                             <button
-                                onClick={() => conn.id && handleDelete(conn.id)}
+                                onClick={() => handleDelete(conn)}
                                 className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
                                 title="Delete Configuration"
                             >
@@ -248,14 +305,27 @@ export const ConfigurationPanel: React.FC = () => {
                                 Cancel
                             </button>
                             <button
+                                onClick={handleTestOnly}
+                                disabled={isTesting || isTestingOnly}
+                                className={clsx("flex items-center gap-2 px-5 py-2 font-medium rounded-lg transition-all outline-none focus:ring-4 focus:ring-indigo-100",
+                                    isTestingOnly ? "bg-slate-300 text-slate-600 cursor-not-allowed" : "bg-white border-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300"
+                                )}
+                            >
+                                {isTestingOnly ? (
+                                    <><Loader2 className="w-4 h-4 animate-spin" /> Testing...</>
+                                ) : (
+                                    <><Play className="w-4 h-4" /> Test Connection</>
+                                )}
+                            </button>
+                            <button
                                 onClick={handleSaveNew}
-                                disabled={isTesting}
+                                disabled={isTesting || isTestingOnly}
                                 className={clsx("flex items-center gap-2 px-6 py-2 text-white font-medium rounded-lg transition-all outline-none focus:ring-4 focus:ring-indigo-100",
-                                    isTesting ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5"
+                                    (isTesting || isTestingOnly) ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5"
                                 )}
                             >
                                 {isTesting ? (
-                                    <><Loader2 className="w-4 h-4 animate-spin" /> Testing & Saving...</>
+                                    <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
                                 ) : (
                                     <><Save className="w-4 h-4" /> {editingId ? "Save Changes" : "Add Connection"}</>
                                 )}

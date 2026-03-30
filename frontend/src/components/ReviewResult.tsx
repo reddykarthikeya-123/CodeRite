@@ -11,6 +11,46 @@ interface ReviewResultProps {
     result: ReviewResponse;
 }
 
+interface StructuredCommentPart {
+    label: 'Evidence' | 'Missing';
+    value: string;
+}
+
+const stripReferenceTags = (comment: string) =>
+    comment.replace(/\[(Page|Slide|Section|Sheet)[^\]]*\]/g, '').trim();
+
+const parseStructuredComment = (comment: string): StructuredCommentPart[] | null => {
+    const cleanComment = stripReferenceTags(comment);
+    if (!cleanComment) {
+        return null;
+    }
+
+    const patterns: StructuredCommentPart['label'][] = ['Evidence', 'Missing'];
+    const parts = patterns.map((label, index) => {
+        const nextLabels = patterns.slice(index + 1).join('|');
+        const regex = nextLabels
+            ? new RegExp(`${label}:\\s*([\\s\\S]*?)(?=\\s*\\|\\s*(?:${nextLabels}):|$)`, 'i')
+            : new RegExp(`${label}:\\s*([\\s\\S]*?)$`, 'i');
+        const match = cleanComment.match(regex);
+        return match
+            ? {
+                label,
+                value: match[1].replace(/\s*\|\s*$/g, '').trim(),
+            }
+            : null;
+    }).filter((part): part is StructuredCommentPart => part !== null && part.value.length > 0);
+
+    return parts.length > 0 ? parts : null;
+};
+
+const formatCommentForReport = (comment: string) => {
+    const structured = parseStructuredComment(comment);
+    if (!structured) {
+        return stripReferenceTags(comment);
+    }
+    return structured.map((part) => `${part.label}: ${part.value}`).join('\n');
+};
+
 export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
     const [showRewritten, setShowRewritten] = useState(false);
     const [selectedFilters, setSelectedFilters] = useState<Set<string>>(new Set(['pass', 'fail', 'warning']));
@@ -86,9 +126,10 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
         doc.text(`Overall Score: ${result.score}/100`, 14, 32);
 
         const tableData = result.checklist.map((item: ChecklistItem) => {
-            let remarks = (item.comment || '').replace(/\[(Page|Slide|Section|Sheet)[^\]]*\]/g, '').trim();
-            if (item.status !== 'Fail' && item.page_references && item.page_references.length > 0) {
-                remarks = `[Loc: ${item.page_references.join(', ')}]\n\n${remarks}`;
+            let remarks = formatCommentForReport(item.comment || '');
+            if (item.page_references && item.page_references.length > 0) {
+                const label = result.reference_format || 'Page';
+                remarks = `[${label}: ${item.page_references.join(', ')}]\n\n${remarks}`;
             }
             return [
                 item.section || 'General',
@@ -303,22 +344,52 @@ export const ReviewResult: React.FC<ReviewResultProps> = ({ result }) => {
                                             </div>
                                             <div className="flex-1 w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                                                 <div className="flex-1 max-w-xl">
+                                                    {(() => {
+                                                        const structuredComment = item.comment ? parseStructuredComment(item.comment) : null;
+                                                        return (
+                                                            <>
                                                     <h5 className="font-bold text-slate-800 text-[15px] leading-snug">{item.item}</h5>
-                                                    {item.status !== 'Fail' && item.page_references && item.page_references.length > 0 && (
+                                                    {item.page_references && item.page_references.length > 0 && (
                                                         <div className="flex flex-wrap gap-1.5 mb-2">
                                                             {item.page_references.map((ref: number, idx: number) => (
                                                                 <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-sm">
-                                                                    Loc: {ref}
+                                                                    {result.reference_format || 'Page'}: {ref}
                                                                 </span>
                                                             ))}
                                                         </div>
                                                     )}
                                                     {item.comment && (
-                                                        <p className="text-[14px] text-slate-600 leading-relaxed">
-                                                            {/* For all items, clean up any residual or hallucinated [Page X] tags from string */}
-                                                            {item.comment.replace(/\[(Page|Slide|Section|Sheet)[^\]]*\]/g, '').trim()}
-                                                        </p>
+                                                        structuredComment ? (
+                                                            <div className="mt-3 space-y-1.5">
+                                                                {structuredComment.map((part) => (
+                                                                    <div
+                                                                        key={part.label}
+                                                                        className="text-[14px] leading-relaxed"
+                                                                    >
+                                                                        <span
+                                                                            className={clsx(
+                                                                                "mr-2 text-[11px] font-black uppercase tracking-[0.18em]",
+                                                                                part.label === 'Evidence' && "text-sky-700",
+                                                                                part.label === 'Missing' && "text-amber-700"
+                                                                            )}
+                                                                        >
+                                                                            {part.label}
+                                                                        </span>
+                                                                        <span className="text-slate-700">
+                                                                            {part.value}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="mt-3 text-[14px] text-slate-600 leading-relaxed">
+                                                                {stripReferenceTags(item.comment)}
+                                                            </p>
+                                                        )
                                                     )}
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <div className="flex-shrink-0">
                                                     <span className={clsx(

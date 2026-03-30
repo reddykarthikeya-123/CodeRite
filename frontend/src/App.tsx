@@ -4,7 +4,7 @@ import { ReviewResult } from './components/ReviewResult';
 import { CodeResult, type CodeAnalysisResponse } from './components/CodeResult';
 import { Modal } from './components/Modal';
 import { ChecklistFilterModal } from './components/ChecklistFilterModal';
-import { analyzeDocument, analyzeCode, fetchChecklistCategories, fetchChecklistItems, type ReviewResponse, type PaginationMetadata } from './api';
+import { analyzeDocument, analyzeCode, fetchChecklistCategories, fetchChecklistItems, type ReviewResponse, type PaginationMetadata, type ChecklistFilterItem } from './api';
 import { Loader2, Settings, ArrowLeft, ListChecks, Upload, FileText, UploadCloud, FileCode2, Code2, Trash2, X, AlertTriangle, FileUp, HelpCircle, Lightbulb } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -28,7 +28,7 @@ function App() {
   
   // Checklist filter state
   const [showChecklistFilter, setShowChecklistFilter] = useState(false);
-  const [checklistItems, setChecklistItems] = useState<{ index: number; section: string; checklist_item: string; original: Record<string, unknown> }[]>([]);
+  const [checklistItems, setChecklistItems] = useState<ChecklistFilterItem[]>([]);
   const [pendingFile, setPendingFile] = useState<{ file: File, category: string } | null>(null);
   const [_enabledChecks, _setEnabledChecks] = useState<string[]>([]); // Track for future use
 
@@ -154,13 +154,8 @@ function App() {
       console.log('[handleFileUpload] Fetching checklist items...');
       const items = await fetchChecklistItems(category);
       console.log('[handleFileUpload] Received items:', items.length);
-      // Add empty original object to match the type
-      const itemsWithOriginal = items.map(item => ({
-        ...item,
-        original: {} as Record<string, unknown>
-      }));
       console.log('[handleFileUpload] Setting state...');
-      setChecklistItems(itemsWithOriginal);
+      setChecklistItems(items);
       setShowChecklistFilter(true);
       console.log('[handleFileUpload] Modal should be open now');
     } catch (err) {
@@ -544,12 +539,7 @@ function App() {
         isOpen={showChecklistFilter}
         onClose={() => setShowChecklistFilter(false)}
         onApply={handleChecklistApply}
-        checklistItems={checklistItems.map(item => ({
-          index: item.index,
-          section: item.section,
-          checklist_item: item.checklist_item,
-          ...item.original
-        }))}
+        checklistItems={checklistItems}
         categoryName={pendingFile?.category || selectedCategory}
       />
     </div>

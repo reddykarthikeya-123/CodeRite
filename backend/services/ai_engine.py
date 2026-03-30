@@ -11,6 +11,7 @@ import os
 import logging
 import asyncio
 import math
+import re
 import tiktoken
 from config.logging_config import get_logger
 
@@ -399,27 +400,12 @@ class AIEngine:
 
         target_checklist = []
         if document_category:
-            all_items = loader.get_checklist_for_category(document_category)
-            
-            # Filter checklist based on enabled_checks if provided
-            if enabled_checks and len(enabled_checks) > 0:
-                # Parse enabled check IDs to get indices
-                enabled_indices = set()
-                for check_id in enabled_checks:
-                    try:
-                        idx = int(check_id.split('-')[0])
-                        enabled_indices.add(idx)
-                    except (ValueError, IndexError):
-                        continue
-                
-                # Filter items to only include enabled checks
-                target_checklist = [
-                    item for idx, item in enumerate(all_items)
-                    if idx in enabled_indices
-                ]
-                logger.info(f"Filtered checklist from {len(all_items)} to {len(target_checklist)} items based on enabled_checks")
-            else:
-                target_checklist = all_items
+            all_items = loader.get_checklist_items_for_category(document_category)
+            target_checklist = loader.get_selected_checklist_items(document_category, enabled_checks)
+            if enabled_checks:
+                logger.info(
+                    f"Filtered checklist from {len(all_items)} to {len(target_checklist)} items based on enabled_checks"
+                )
 
         def build_checklist_context(checklist_subset: List[Dict[str, Any]]) -> str:
             if not checklist_subset:
@@ -433,17 +419,8 @@ class AIEngine:
         expected_checklist_entries: List[Dict[str, str]] = []
         expected_key_order: Dict[tuple[str, str], int] = {}
         for index, checklist_item in enumerate(target_checklist):
-            section = str(
-                checklist_item.get("Section")
-                or checklist_item.get("section")
-                or "General"
-            )
-            item_text = str(
-                checklist_item.get("ChecklistItem")
-                or checklist_item.get("checklist_item")
-                or checklist_item.get("Unnamed: 1")
-                or ""
-            )
+            section = str(checklist_item.get("section") or "General")
+            item_text = str(checklist_item.get("checklist_item") or "")
             if not item_text:
                 continue
             expected_checklist_entries.append({
@@ -475,9 +452,14 @@ class AIEngine:
                 else:
                     reference_format = None
                     reference_enabled = False
-            elif file_type in ["pdf", "pptx", "ppt"]:
-                reference_format = "Page" if file_type in ["pdf"] else "Slide"
-            elif file_type in ["xlsx", "xls", "csv"]:
+            elif file_type in ["pdf", "docx", "doc", "car"]:
+                reference_format = "Page"
+                reference_enabled = True
+            else:
+                # No references for PPTX, Excel, etc (as per latest user preference)
+                reference_format = None
+                reference_enabled = False
+            if file_type in ["xlsx", "xls", "csv"]:
                 reference_format = "Sheet"  # Will be formatted as "Sheet: SheetName" in output
 
         is_car_analysis = bool("[CAR_METADATA]" in text and file_type == "car")
@@ -485,11 +467,26 @@ class AIEngine:
         # Extract total page count from document text for validation
         import re
         total_pages = 0
-        if file_type and file_type.lower().strip('.') in ["pdf", "docx", "doc"] and reference_format == "Page":
-            # Page-based files have page markers in the format "--- Page X Text ---", "--- Page X Tables ---", "--- Page X Visual Metadata ---", or "--- Page X OCR ---"
+        parsed_total_pages = 0
+        if isinstance(pagination_metadata, dict):
+            try:
+                parsed_total_pages = int(pagination_metadata.get("total_pages") or 0)
+            except (TypeError, ValueError):
+                parsed_total_pages = 0
+
+        if reference_enabled and reference_format == "Page":
+            total_pages = parsed_total_pages
+            # 1. Search for standard PDF/DOCX markers
             page_matches = re.findall(r'--- Page (\d+) (?:Text|Tables|Visual Metadata|OCR)?', text)
-            if page_matches:
+            if total_pages == 0 and page_matches:
                 total_pages = max([int(p) for p in page_matches], default=0)
+            
+            # 2. Fallback for DOCX paragraphs if page markers are missing but reference is enabled
+            if total_pages == 0:
+                fallback_matches = re.findall(r'(?:^|\n|--- | )P(\d+): ', text)
+                if fallback_matches:
+                    total_pages = max([int(p) for p in fallback_matches], default=0)
+                    logger.info(f"Using fallback paragraph markers as locations. total={total_pages}")
         elif file_type and file_type.lower().strip('.') in ["pptx", "ppt"]:
             slide_matches = re.findall(r'--- Slide (\d+) ---', text)
             if slide_matches:
@@ -570,7 +567,10 @@ class AIEngine:
 
         3. **Evidence-First Decisioning**:
         - Do not mark any checklist item as "Pass" unless you can quote concrete evidence from the parsed content or provided images.
-        - For every checklist comment, include this structure: `Evidence: <quoted snippet or 'None'> | Found: <what is present> | Missing: <what is missing or 'None'>`.
+        - For every checklist comment, use this exact structure: `Evidence: <specific snippet or concrete summary of document content, not a restatement of the checklist> | Missing: <brief factual summary of what is absent or 'None'>`.
+        - The `Evidence` part must point to actual document content. Quote or summarize the discovered text, heading, table row, visual label, or metadata. Do NOT simply rewrite the checklist item.
+        - The `Evidence` part should already make clear what was found, such as `Cover page shows title 'Business Requirement Document', version 6.0, author name, and date September 5, 2025.`
+        - The `Missing` part must list only genuinely missing elements. Use `None` when nothing is missing.
         - If evidence is weak or partial, use "Warning" instead of "Pass".
         - If no evidence is present, use "Fail".
         - Treat synonym labels as equivalent signals when evaluating evidence, including: `author`, `authors`, `document author`; `approver`, `approved by`; `revision history`, `change history`, `version history`; `version`, `document version`, `rev`.
@@ -596,7 +596,13 @@ class AIEngine:
         You must output a JSON object with the following structure:
         {{
             "checklist": [
-                {{"section": "<Section Name>", "item": "<Checklist Item>", "status": "<Pass/Fail/Warning>", "comment": "<Explanation>"}}
+                {{
+                    "section": "<Section Name>", 
+                    "item": "<Checklist Item>", 
+                    "status": "<Pass/Fail/Warning/Not Seen>", 
+                    "comment": "<Explanation>",
+                    "page_references": [1, 2]
+                }}
             ],
             "suggestions": [
                 {{"type": "<Fail/Warning>", "text": "<Suggestion 1>"}}
@@ -887,6 +893,26 @@ Custom Instructions: {custom_instructions}
                         return "This item appears not applicable to the analyzed document."
                     return "Supporting evidence was found in the analyzed document."
 
+                def normalize_text(s: str) -> str:
+                    import re
+                    # Remove punctuation and normalize whitespace/case for robust matching
+                    return re.sub(r'[^a-z0-9]', '', str(s).lower())
+
+                def get_bucket_key(existing_keys, section: str, item_text: str) -> tuple[str, str]:
+                    norm_sec = normalize_text(section)
+                    norm_item = normalize_text(item_text)
+                    exact_key = (norm_sec, norm_item)
+                    
+                    if exact_key in existing_keys:
+                        return exact_key
+                        
+                    # If exact match fails (e.g., AI changed section name), match just on item text
+                    for k_sec, k_item in existing_keys:
+                        if k_item == norm_item:
+                            return (k_sec, k_item)
+                            
+                    return exact_key
+
                 merged_checklist: Dict[tuple[str, str], Dict[str, Any]] = {}
                 merged_item_state: Dict[tuple[str, str], Dict[str, Any]] = {}
 
@@ -895,7 +921,7 @@ Custom Instructions: {custom_instructions}
                     item_text: str,
                     template: Optional[Dict[str, Any]] = None,
                 ) -> tuple[str, str]:
-                    key = (section, item_text)
+                    key = get_bucket_key(merged_checklist.keys(), section, item_text)
                     if key not in merged_checklist:
                         base_item = dict(template) if template else {}
                         base_item["section"] = section
@@ -910,9 +936,11 @@ Custom Instructions: {custom_instructions}
                                 "na": [],
                                 "not_seen": [],
                             },
+                            "page_references": set(),
                         }
                     return key
 
+                # Initialize buckets with expected items first
                 for expected_item in expected_checklist_entries:
                     ensure_item_bucket(expected_item["section"], expected_item["item"])
 
@@ -923,6 +951,7 @@ Custom Instructions: {custom_instructions}
                         if not item_text:
                             continue
 
+                        # This will match the expected item bucket even if section was modified by AI
                         key = ensure_item_bucket(section, item_text, item)
                         normalized_status = normalize_review_status(item.get("status"))
                         merged_item_state[key]["statuses"].append(normalized_status)
@@ -930,18 +959,60 @@ Custom Instructions: {custom_instructions}
                             merged_item_state[key]["comments_by_status"][normalized_status],
                             item.get("comment", ""),
                         )
+                        
+                        # Merge page references from this chunk
+                        refs = item.get("page_references", [])
+                        if isinstance(refs, list):
+                            for r in refs:
+                                try:
+                                    merged_item_state[key]["page_references"].add(int(r))
+                                except (ValueError, TypeError):
+                                    pass
 
                 for key, merged_item in merged_checklist.items():
                     state = merged_item_state.get(key, {
                         "statuses": [],
                         "comments_by_status": {"pass": [], "warning": [], "fail": [], "na": [], "not_seen": []},
                     })
+                    
+                    # If the only status we have is empty (e.g. it was an expected item but AI never returned it)
+                    if not state["statuses"]:
+                        merged_item["status"] = "Fail"
+                        merged_item["comment"] = "No result was returned for this checklist item."
+                        checklist_items.append(merged_item)
+                        continue
+
                     final_status = finalize_document_status(state["statuses"])
                     merged_item["status"] = format_review_status(final_status)
                     merged_item["comment"] = build_merged_comment(final_status, state["comments_by_status"])
+                    
+                    # FINAL STEP: Assign merged page references (sorted list)
+                    merged_item["page_references"] = sorted(list(state.get("page_references", set())))
+                    
+                    if final_status == "not_seen":
+                        merged_item["status"] = "Fail"
+                        if not merged_item["comment"] or merged_item["comment"] == "Supporting evidence was found in the analyzed document.":
+                            merged_item["comment"] = "No supporting evidence was found anywhere in the analyzed document."
+                            
                     checklist_items.append(merged_item)
             else:
                 checklist_items_map: Dict[tuple[str, str], Dict[str, Any]] = {}
+                
+                def normalize_text(s: str) -> str:
+                    import re
+                    return re.sub(r'[^a-z0-9]', '', str(s).lower())
+
+                def get_bucket_key(existing_keys, section: str, item_text: str) -> tuple[str, str]:
+                    norm_sec = normalize_text(section)
+                    norm_item = normalize_text(item_text)
+                    exact_key = (norm_sec, norm_item)
+                    
+                    if exact_key in existing_keys:
+                        return exact_key
+                    for k_sec, k_item in existing_keys:
+                        if k_item == norm_item:
+                            return (k_sec, k_item)
+                    return exact_key
 
                 for res in results:
                     for item in res.get("checklist", []):
@@ -950,6 +1021,7 @@ Custom Instructions: {custom_instructions}
                         if not item_text:
                             continue
 
+                        key = get_bucket_key(checklist_items_map.keys(), section, item_text)
                         normalized_status = normalize_review_status(item.get("status"))
                         item_copy = dict(item)
                         item_copy["section"] = section
@@ -963,10 +1035,11 @@ Custom Instructions: {custom_instructions}
                             )
                         else:
                             item_copy["status"] = format_review_status(normalized_status)
-                        checklist_items_map[(section, item_text)] = item_copy
+                        
+                        checklist_items_map[key] = item_copy
 
                 for expected_item in expected_checklist_entries:
-                    key = (expected_item["section"], expected_item["item"])
+                    key = get_bucket_key(checklist_items_map.keys(), expected_item["section"], expected_item["item"])
                     if key not in checklist_items_map:
                         checklist_items_map[key] = {
                             "section": expected_item["section"],
@@ -1002,8 +1075,15 @@ Custom Instructions: {custom_instructions}
             final_response = {
                 "checklist": checklist_items,
                 "suggestions": merged_suggestions,
-                "rewritten_content": results[0].get("rewritten_content", "") if results else ""
+                "rewritten_content": results[0].get("rewritten_content", "") if results else "",
+                "reference_format": reference_format
             }
+
+            if not reference_enabled or not reference_format:
+                for item in final_response.get("checklist", []):
+                    item["page_references"] = []
+            else:
+                final_response = self._resolve_page_references(final_response, text, reference_format)
 
             # Validate and correct page numbers in AI response
             final_response = self._validate_page_numbers(final_response, total_pages, reference_format)
@@ -1040,6 +1120,199 @@ Custom Instructions: {custom_instructions}
                 "rewritten_content": ""
             }
 
+    def _extract_comment_field(self, comment: str, label: str, next_labels: List[str]) -> str:
+        if not comment:
+            return ""
+        next_labels_pattern = "|".join(next_labels)
+        if next_labels_pattern:
+            pattern = rf"{label}:\s*([\s\S]*?)(?=\s*\|\s*(?:{next_labels_pattern}):|$)"
+        else:
+            pattern = rf"{label}:\s*([\s\S]*?)$"
+        match = re.search(pattern, comment, flags=re.IGNORECASE)
+        return match.group(1).strip() if match else ""
+
+    def _normalize_locator_text(self, value: str) -> str:
+        return re.sub(r'[^a-z0-9]+', ' ', str(value).lower()).strip()
+
+    def _extract_keyword_terms(self, item: Dict[str, Any]) -> List[str]:
+        stop_words = {
+            "about", "actual", "after", "against", "also", "and", "are", "but", "clear",
+            "clearly", "criteria", "criterion", "defined", "described", "document",
+            "documented", "evidence", "for", "from", "found", "has", "have", "in",
+            "include", "includes", "is", "it", "its", "missing", "none", "not", "of",
+            "on", "or", "page", "present", "provided", "requirement", "requirements",
+            "section", "should", "shows", "specific", "stated", "the", "their", "them",
+            "there", "this", "those", "with", "written"
+        }
+
+        raw_values = [
+            str(item.get("item") or ""),
+            self._extract_comment_field(str(item.get("comment") or ""), "Evidence", ["Missing", "Found"]),
+            self._extract_comment_field(str(item.get("comment") or ""), "Missing", ["Evidence", "Found"]),
+        ]
+
+        keywords: List[str] = []
+        seen = set()
+        for raw_value in raw_values:
+            normalized = self._normalize_locator_text(raw_value)
+            for word in normalized.split():
+                if len(word) < 4 or word in stop_words or word.isdigit():
+                    continue
+                if word not in seen:
+                    seen.add(word)
+                    keywords.append(word)
+
+        return keywords
+
+    def _build_page_text_index(self, text: str) -> Dict[int, str]:
+        page_sections = list(re.finditer(r'--- Page (\d+) (?:Text|Tables|Visual Metadata|OCR) ---', text))
+        if not page_sections:
+            return {}
+
+        page_chunks: Dict[int, List[str]] = {}
+        for index, match in enumerate(page_sections):
+            page_number = int(match.group(1))
+            chunk_start = match.end()
+            chunk_end = page_sections[index + 1].start() if index + 1 < len(page_sections) else len(text)
+            page_chunks.setdefault(page_number, []).append(text[chunk_start:chunk_end])
+
+        return {
+            page_number: "\n".join(chunks)
+            for page_number, chunks in page_chunks.items()
+        }
+
+    def _extract_reference_candidates(self, item: Dict[str, Any]) -> List[str]:
+        comment = str(item.get("comment") or "")
+        candidates: List[str] = []
+
+        explicit_pages = re.findall(r'\bpage\s+(\d+)\b', comment, flags=re.IGNORECASE)
+        candidates.extend([f"page {page}" for page in explicit_pages])
+
+        evidence_text = self._extract_comment_field(comment, "Evidence", ["Missing", "Found"])
+        if evidence_text and evidence_text.lower() != "none":
+            quoted_matches = re.findall(r"'([^']{4,})'|\"([^\"]{4,})\"", evidence_text)
+            for single_quote, double_quote in quoted_matches:
+                candidate = (single_quote or double_quote).strip()
+                if candidate:
+                    candidates.append(candidate)
+
+            cleaned_evidence = re.sub(r'^(found|shows|contains)\s+', '', evidence_text, flags=re.IGNORECASE).strip()
+            if cleaned_evidence:
+                candidates.append(cleaned_evidence)
+
+        unique_candidates: List[str] = []
+        seen_candidates = set()
+        for candidate in candidates:
+            normalized = self._normalize_locator_text(candidate)
+            if len(normalized) < 4 or normalized in seen_candidates:
+                continue
+            seen_candidates.add(normalized)
+            unique_candidates.append(candidate.strip())
+
+        return unique_candidates
+
+    def _score_page_candidates(
+        self,
+        item: Dict[str, Any],
+        normalized_page_text_index: Dict[int, str],
+    ) -> Dict[int, int]:
+        page_scores: Dict[int, int] = {}
+
+        direct_page_numbers = []
+        for candidate in self._extract_reference_candidates(item):
+            page_match = re.fullmatch(r'page\s+(\d+)', candidate.strip(), flags=re.IGNORECASE)
+            if page_match:
+                direct_page_numbers.append(int(page_match.group(1)))
+                continue
+
+            normalized_candidate = self._normalize_locator_text(candidate)
+            if len(normalized_candidate) < 4:
+                continue
+
+            for page_number, page_text in normalized_page_text_index.items():
+                if normalized_candidate in page_text:
+                    # Strong score for an exact normalized phrase match.
+                    page_scores[page_number] = page_scores.get(page_number, 0) + 12
+                else:
+                    candidate_words = normalized_candidate.split()
+                    if len(candidate_words) >= 3:
+                        overlap = sum(1 for word in candidate_words if word in page_text)
+                        if overlap >= 3:
+                            page_scores[page_number] = page_scores.get(page_number, 0) + overlap
+
+        for page_number in direct_page_numbers:
+            page_scores[page_number] = page_scores.get(page_number, 0) + 50
+
+        keyword_terms = self._extract_keyword_terms(item)
+        if keyword_terms:
+            for page_number, page_text in normalized_page_text_index.items():
+                keyword_hits = sum(1 for keyword in keyword_terms if keyword in page_text)
+                if keyword_hits:
+                    page_scores[page_number] = page_scores.get(page_number, 0) + keyword_hits
+
+        return page_scores
+
+    def _resolve_page_references(self, response: dict, text: str, reference_format: Optional[str]) -> dict:
+        if reference_format != "Page":
+            return response
+
+        page_text_index = self._build_page_text_index(text)
+        if not page_text_index:
+            return response
+
+        normalized_page_text_index = {
+            page_number: self._normalize_locator_text(page_text)
+            for page_number, page_text in page_text_index.items()
+        }
+
+        for item in response.get("checklist", []):
+            status = str(item.get("status") or "").strip().lower()
+            if "warning" in status:
+                normalized_status = "warning"
+            elif "pass" in status:
+                normalized_status = "pass"
+            else:
+                normalized_status = status
+            if normalized_status not in {"pass", "warning"}:
+                continue
+
+            existing_refs = item.get("page_references", [])
+            resolved_pages = set()
+            if isinstance(existing_refs, list):
+                for ref in existing_refs:
+                    try:
+                        resolved_pages.add(int(ref))
+                    except (TypeError, ValueError):
+                        continue
+
+            page_scores = self._score_page_candidates(item, normalized_page_text_index)
+            if page_scores:
+                ranked_pages = sorted(
+                    page_scores.items(),
+                    key=lambda entry: (-entry[1], entry[0])
+                )
+                best_page, best_score = ranked_pages[0]
+                second_best_score = ranked_pages[1][1] if len(ranked_pages) > 1 else 0
+
+                resolved_pages.add(best_page)
+
+                # Keep additional pages only when they are strongly supported too.
+                for page_number, score in ranked_pages[1:]:
+                    if score >= 8 and score >= best_score - 2:
+                        resolved_pages.add(page_number)
+
+                # If the best page is only weakly supported and AI already supplied refs, keep those as well.
+                if best_score <= 2 and existing_refs:
+                    for ref in existing_refs:
+                        try:
+                            resolved_pages.add(int(ref))
+                        except (TypeError, ValueError):
+                            continue
+
+            item["page_references"] = sorted(resolved_pages)
+
+        return response
+
     def _validate_page_numbers(self, response: dict, total_pages: int, reference_format: str) -> dict:
         """Validate and correct page numbers in AI response.
         
@@ -1054,8 +1327,6 @@ Custom Instructions: {custom_instructions}
         if not total_pages or not reference_format or reference_format == "Sheet":
             return response
             
-        import re
-        
         for item in response.get("checklist", []):
             page_refs = item.get("page_references", [])
             if not isinstance(page_refs, list):
@@ -1080,7 +1351,7 @@ Custom Instructions: {custom_instructions}
                     pass
             
             # De-duplicate and assign back
-            item["page_references"] = list(set(valid_refs))
+            item["page_references"] = sorted(set(valid_refs))
             
         return response
 

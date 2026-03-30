@@ -1,19 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Check, Minus, Search, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-interface ChecklistItem {
-  index?: number;
-  section?: string;
-  checklist_item?: string;
-  [key: string]: unknown;
-}
+import type { ChecklistFilterItem } from '../api';
 
 interface ChecklistFilterModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApply: (selectedChecks: string[]) => void;
-  checklistItems: ChecklistItem[];
+  checklistItems: ChecklistFilterItem[];
   categoryName: string;
 }
 
@@ -28,51 +22,45 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
   const [selectedChecks, setSelectedChecks] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
-  // Group checklist items by section (memoized to avoid re-running useEffect on every render)
+  const getCheckId = (item: ChecklistFilterItem, fallbackIndex = 0) =>
+    item.id || String(item.index ?? fallbackIndex);
+
   const groupedItems = useMemo(() => checklistItems.reduce((acc, item) => {
-    // Support both new format (Section) and old format (QA Reviewer Name)
-    const section = (item.Section || item.section || item['QA Reviewer Name'] || 'General') as string;
+    const section = item.section || 'General';
     if (!acc[section]) {
       acc[section] = [];
     }
     acc[section].push(item);
     return acc;
-  }, {} as Record<string, typeof checklistItems>), [checklistItems]);
+  }, {} as Record<string, ChecklistFilterItem[]>), [checklistItems]);
 
-  // Initialize all checks as selected when the modal opens
   useEffect(() => {
-    if (isOpen) {
-      const allCheckIds = new Set<string>();
-      checklistItems.forEach((item, index) => {
-        // Support both new format (ChecklistItem) and old format (Unnamed: 1, checklist_item)
-        const checkText = (item.ChecklistItem || item.checklist_item || item['Unnamed: 1']) as string;
-        // Use the original index from the API response
-        const originalIndex = item.index ?? index;
-        if (checkText && checkText !== 'Checklist Item') {
-          allCheckIds.add(`${originalIndex}-${checkText}`);
-        }
-      });
-      setSelectedChecks(allCheckIds);
-      
-      // Expand all sections by default
-      setExpandedSections(new Set(Object.keys(groupedItems)));
+    if (!isOpen) {
+      return;
     }
-  }, [isOpen, checklistItems]); // groupedItems removed — it's derived from checklistItems and causes infinite loops if included
 
-  // Filter items based on search
-  const getFilteredSections = () => {
+    const allCheckIds = new Set<string>();
+    checklistItems.forEach((item, index) => {
+      if (item.checklist_item) {
+        allCheckIds.add(getCheckId(item, index));
+      }
+    });
+    setSelectedChecks(allCheckIds);
+    setExpandedSections(new Set(Object.keys(groupedItems)));
+  }, [isOpen, checklistItems, groupedItems]);
+
+  const filteredSections = useMemo(() => {
     if (!searchTerm.trim()) {
       return groupedItems;
     }
 
-    const filtered: Record<string, typeof checklistItems> = {};
+    const filtered: Record<string, ChecklistFilterItem[]> = {};
     const term = searchTerm.toLowerCase();
 
     Object.entries(groupedItems).forEach(([section, items]) => {
-      const matchingItems = items.filter(item => {
-        // Support both new format (ChecklistItem) and old format (Unnamed: 1, checklist_item)
-        const checkText = ((item.ChecklistItem || item.checklist_item || item['Unnamed: 1']) as string || '').toLowerCase();
-        const sectionName = ((item.Section || item.section || item['QA Reviewer Name']) as string || '').toLowerCase();
+      const matchingItems = items.filter((item) => {
+        const checkText = (item.checklist_item || '').toLowerCase();
+        const sectionName = (item.section || '').toLowerCase();
         return checkText.includes(term) || sectionName.includes(term);
       });
 
@@ -82,12 +70,10 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
     });
 
     return filtered;
-  };
-
-  const filteredSections = getFilteredSections();
+  }, [groupedItems, searchTerm]);
 
   const toggleSection = (section: string) => {
-    setExpandedSections(prev => {
+    setExpandedSections((prev) => {
       const next = new Set(prev);
       if (next.has(section)) {
         next.delete(section);
@@ -99,56 +85,38 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
   };
 
   const toggleCheck = (checkId: string) => {
-    console.log('[toggleCheck] Toggling:', checkId);
-    setSelectedChecks(prev => {
+    setSelectedChecks((prev) => {
       const next = new Set(prev);
-      console.log('[toggleCheck] Previous size:', prev.size, 'Has checkId:', prev.has(checkId));
       if (next.has(checkId)) {
         next.delete(checkId);
-        console.log('[toggleCheck] Deleted, new size:', next.size);
       } else {
         next.add(checkId);
-        console.log('[toggleCheck] Added, new size:', next.size);
       }
       return next;
     });
   };
 
   const selectAll = () => {
-    console.log('[selectAll] Called');
     const allCheckIds = new Set<string>();
-    Object.values(filteredSections).forEach(items => {
-      items.forEach((item, index) => {
-        // Support both new and old field names
-        const checkText = (item.ChecklistItem || item.checklist_item || item['Unnamed: 1']) as string;
-        // Use the original index from the API response
-        const originalIndex = item.index ?? index;
-        if (checkText && checkText !== 'Checklist Item') {
-          allCheckIds.add(`${originalIndex}-${checkText}`);
-        }
-      });
+    Object.values(filteredSections).forEach((items) => {
+      items.forEach((item, index) => allCheckIds.add(getCheckId(item, index)));
     });
-    console.log('[selectAll] Selected', allCheckIds.size, 'items');
     setSelectedChecks(allCheckIds);
   };
 
   const deselectAll = () => {
-    console.log('[deselectAll] Called');
     setSelectedChecks(new Set());
   };
 
   const handleApply = () => {
-    const selectedArray = Array.from(selectedChecks);
-    console.log('[handleApply] Applying with', selectedArray.length, 'selected checks:', selectedArray.slice(0, 5), '...');
-    onApply(selectedArray);
+    onApply(Array.from(selectedChecks));
     onClose();
   };
 
   const totalChecks = Object.values(filteredSections).reduce(
-    (sum, items) => sum + items.filter(i => (i.checklist_item || i['Unnamed: 1']) && (i.checklist_item || i['Unnamed: 1']) !== 'Checklist Item').length,
+    (sum, items) => sum + items.length,
     0
   );
-
   const selectedCount = selectedChecks.size;
 
   if (!isOpen) return null;
@@ -168,9 +136,8 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
           exit={{ scale: 0.95, opacity: 0, y: 20 }}
           transition={{ type: "spring", duration: 0.3 }}
           className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden"
-          onClick={e => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-gradient-to-r from-[#1E40AF]/5 to-[#3B82F6]/5">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-[#1E40AF]/10 rounded-lg">
@@ -190,22 +157,19 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
             </button>
           </div>
 
-          {/* Search and Actions Bar */}
           <div className="p-4 border-b border-slate-200 bg-white">
             <div className="flex items-center gap-4">
-              {/* Search */}
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Search checklist items..."
                   value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] outline-none text-sm transition-all"
                 />
               </div>
 
-              {/* Bulk Actions */}
               <div className="flex items-center gap-2">
                 <button
                   onClick={selectAll}
@@ -221,7 +185,6 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
                 </button>
               </div>
 
-              {/* Counter */}
               <div className="px-4 py-2 bg-[#3B82F6]/10 rounded-lg">
                 <span className="text-sm font-bold text-[#1E40AF]">
                   {selectedCount} / {totalChecks}
@@ -231,24 +194,12 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
             </div>
           </div>
 
-          {/* Checklist Items */}
           <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
             <div className="space-y-3">
               {Object.entries(filteredSections).map(([section, items]) => {
                 const isExpanded = expandedSections.has(section);
-                const sectionChecks = items
-                  .filter(item => {
-                    const checkText = (item.ChecklistItem || item.checklist_item || item['Unnamed: 1']) as string;
-                    return checkText && checkText !== 'Checklist Item';
-                  })
-                  .map((item, index) => {
-                    const checkText = (item.ChecklistItem || item.checklist_item || item['Unnamed: 1']) as string;
-                    // Get the original index from the API response
-                    const originalIndex = item.index ?? index;
-                    return `${originalIndex}-${checkText}`;
-                  });
-                
-                const selectedInSection = sectionChecks.filter(id => selectedChecks.has(id)).length;
+                const sectionChecks = items.map((item, index) => getCheckId(item, index));
+                const selectedInSection = sectionChecks.filter((id) => selectedChecks.has(id)).length;
                 const allSelected = sectionChecks.length > 0 && selectedInSection === sectionChecks.length;
                 const someSelected = selectedInSection > 0 && selectedInSection < sectionChecks.length;
 
@@ -257,7 +208,6 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
                     key={section}
                     className="bg-white rounded-xl border border-slate-200 overflow-hidden"
                   >
-                    {/* Section Header */}
                     <button
                       onClick={() => toggleSection(section)}
                       className="w-full px-4 py-3 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white hover:bg-slate-50 transition-colors"
@@ -271,16 +221,13 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
                               ? 'bg-[#3B82F6] border-[#3B82F6]'
                               : 'bg-white border-slate-300'
                           }`}
-                          onClick={e => {
+                          onClick={(e) => {
                             e.stopPropagation();
-                            // Create a completely new Set to trigger re-render
                             const newSelectedChecks = new Set(selectedChecks);
                             if (allSelected) {
-                              // Deselect all in this section
-                              sectionChecks.forEach(id => newSelectedChecks.delete(id));
+                              sectionChecks.forEach((id) => newSelectedChecks.delete(id));
                             } else {
-                              // Select all in this section
-                              sectionChecks.forEach(id => newSelectedChecks.add(id));
+                              sectionChecks.forEach((id) => newSelectedChecks.add(id));
                             }
                             setSelectedChecks(newSelectedChecks);
                           }}
@@ -308,7 +255,6 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
                       </motion.div>
                     </button>
 
-                    {/* Section Items */}
                     <AnimatePresence>
                       {isExpanded && (
                         <motion.div
@@ -320,13 +266,7 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
                         >
                           <div className="p-4 space-y-2 border-t border-slate-100">
                             {items.map((item, index) => {
-                              // Support both new format (ChecklistItem) and old format (Unnamed: 1, checklist_item)
-                              const checkText = (item.ChecklistItem || item.checklist_item || item['Unnamed: 1']) as string;
-                              // Get the original index from the API response
-                              const originalIndex = item.index ?? index;
-                              if (!checkText || checkText === 'Checklist Item') return null;
-
-                              const checkId = `${originalIndex}-${checkText}`;
+                              const checkId = getCheckId(item, index);
                               const isSelected = selectedChecks.has(checkId);
 
                               return (
@@ -334,7 +274,7 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
                                   key={checkId}
                                   initial={{ opacity: 0, x: -10 }}
                                   animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: originalIndex * 0.02 }}
+                                  transition={{ delay: index * 0.02 }}
                                   className={`flex items-start gap-3 p-3 rounded-lg transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1E40AF] focus:ring-opacity-50 ${
                                     isSelected
                                       ? 'bg-[#1E40AF]/5 hover:bg-[#1E40AF]/10'
@@ -365,7 +305,7 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
                                       isSelected ? 'text-slate-800' : 'text-slate-500'
                                     }`}
                                   >
-                                    {checkText as string}
+                                    {item.checklist_item}
                                   </span>
                                 </motion.div>
                               );
@@ -388,13 +328,12 @@ export const ChecklistFilterModal: React.FC<ChecklistFilterModalProps> = ({
             </div>
           </div>
 
-          {/* Footer */}
           <div className="p-4 border-t border-slate-200 bg-white flex items-center justify-between">
             <p className="text-sm text-slate-600">
               {selectedCount === 0 ? (
-                <span className="text-amber-600 font-medium">⚠️ No checks selected. At least one check should be enabled.</span>
+                <span className="text-amber-600 font-medium">No checks selected. At least one check should be enabled.</span>
               ) : selectedCount === totalChecks ? (
-                <span className="text-[#1E40AF] font-medium">✓ All checks enabled</span>
+                <span className="text-[#1E40AF] font-medium">All checks enabled</span>
               ) : (
                 <span>{totalChecks - selectedCount} checks will be skipped</span>
               )}

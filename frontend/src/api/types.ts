@@ -7,6 +7,13 @@ export interface Connection {
   is_active?: boolean;
 }
 
+export interface ChecklistFilterItem {
+  id: string;
+  index: number;
+  section: string;
+  checklist_item: string;
+}
+
 export interface ChecklistItem {
   section: string;
   item: string;
@@ -45,6 +52,7 @@ export interface ReviewResponse {
   filename?: string;
   pagination_warning?: string;
   analysis_metadata?: AnalysisMetadata;
+  reference_format?: string;
 }
 
 export interface CodeFileReview {

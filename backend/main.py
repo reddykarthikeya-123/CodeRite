@@ -50,6 +50,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 REQUEST_FINGERPRINT_PREFIX_LEN = 12
+ANALYSIS_FINGERPRINT_VERSION = os.getenv("ANALYSIS_FINGERPRINT_VERSION", "analysis_v6")
 
 
 def _is_truthy_env(value: str) -> bool:
@@ -82,10 +83,29 @@ def _hash_images(images: Optional[List[str]]) -> List[str]:
     return [_sha256_text(image or "") for image in images]
 
 
+def _looks_like_error_review_payload(payload: object) -> bool:
+    if not isinstance(payload, dict):
+        return True
+
+    checklist = payload.get("checklist", [])
+    if not isinstance(checklist, list) or not checklist:
+        return True
+
+    for item in checklist:
+        if not isinstance(item, dict):
+            continue
+        item_text = str(item.get("item") or "").strip().lower()
+        comment = str(item.get("comment") or "").strip().lower()
+        if item_text == "ai analysis" and comment.startswith("error:"):
+            return True
+
+    return False
+
+
 def _get_checklist_snapshot_hash(category: Optional[str]) -> str:
     if not category:
         return _sha256_text("")
-    checklist_items = loader.get_checklist_for_category(category) or []
+    checklist_items = loader.get_checklist_items_for_category(category) or []
     return _sha256_text(_canonical_json(checklist_items))
 
 
@@ -98,6 +118,7 @@ def _build_request_fingerprint(
 ) -> str:
     enabled_checks_sorted = sorted(analysis_request.enabled_checks or [])
     fingerprint_payload = {
+        "analysis_fingerprint_version": ANALYSIS_FINGERPRINT_VERSION,
         "text_hash": _sha256_text(analysis_request.text or ""),
         "images_hashes": _hash_images(analysis_request.images or []),
         "document_category": analysis_request.document_category,
@@ -233,21 +254,8 @@ async def get_checklists():
 @app.get("/api/checklists/{category}")
 async def get_checklist_items(category: str):
     """Get checklist items for a specific category."""
-    items = loader.get_checklist_for_category(category)
-    # Filter out header row and return only items with actual checklist text
-    filtered_items = []
-    for idx, item in enumerate(items):
-        # Support both new format (Section, ChecklistItem) and old format (QA Reviewer Name, Unnamed: 1)
-        check_text = item.get('ChecklistItem') or item.get('checklist_item') or item.get('Unnamed: 1')
-        section = item.get('Section') or item.get('section') or item.get('QA Reviewer Name') or 'General'
-        if check_text and check_text != 'Checklist Item':
-            filtered_items.append({
-                'index': idx,
-                'section': section,
-                'checklist_item': check_text,
-                'original': item
-            })
-    return {'category': category, 'items': filtered_items}
+    items = loader.get_checklist_items_for_category(category)
+    return {'category': category, 'items': items}
 
 @app.get("/api/connections")
 @limiter.limit("30/minute")
@@ -497,25 +505,30 @@ async def analyze_document(request: Request, analysis_request: AnalysisRequest, 
             cached_review = cache_result.scalars().first()
             if cached_review and isinstance(cached_review.full_response_json, dict):
                 cached_payload = _json_deepcopy(cached_review.full_response_json)
-                metadata = cached_payload.get("analysis_metadata", {})
-                if not isinstance(metadata, dict):
-                    metadata = {}
+                if _looks_like_error_review_payload(cached_payload):
+                    logger.warning(
+                        f"Skipping cached error payload for analysis_fingerprint={fingerprint_short}"
+                    )
+                else:
+                    metadata = cached_payload.get("analysis_metadata", {})
+                    if not isinstance(metadata, dict):
+                        metadata = {}
 
-                metadata.update({
-                    "cache_hit": True,
-                    "request_fingerprint": fingerprint_short,
-                    "deterministic_mode": deterministic_mode,
-                    "cache_mode": cache_mode,
-                    "provider": provider,
-                    "model_name": model_name
-                })
-                cached_payload["analysis_metadata"] = metadata
+                    metadata.update({
+                        "cache_hit": True,
+                        "request_fingerprint": fingerprint_short,
+                        "deterministic_mode": deterministic_mode,
+                        "cache_mode": cache_mode,
+                        "provider": provider,
+                        "model_name": model_name
+                    })
+                    cached_payload["analysis_metadata"] = metadata
 
-                logger.info(
-                    f"analysis_fingerprint={fingerprint_short} cache_hit=True force_refresh={force_refresh} "
-                    f"provider={provider}/{model_name} deterministic_mode={deterministic_mode}"
-                )
-                return cached_payload
+                    logger.info(
+                        f"analysis_fingerprint={fingerprint_short} cache_hit=True force_refresh={force_refresh} "
+                        f"provider={provider}/{model_name} deterministic_mode={deterministic_mode}"
+                    )
+                    return cached_payload
 
         review_result = await engine.analyze_document(
             analysis_request.text,
@@ -536,7 +549,7 @@ async def analyze_document(request: Request, analysis_request: AnalysisRequest, 
             "model_name": model_name
         }
 
-        if use_exact_cache:
+        if use_exact_cache and not _looks_like_error_review_payload(review_result):
             try:
                 review_record = DocumentReview(
                     filename=analysis_request.filename or "",
@@ -549,6 +562,10 @@ async def analyze_document(request: Request, analysis_request: AnalysisRequest, 
             except Exception as cache_save_error:
                 await db.rollback()
                 logger.warning(f"Failed to save analysis cache entry: {cache_save_error}")
+        elif use_exact_cache:
+            logger.warning(
+                f"Not caching error/fallback analysis payload for analysis_fingerprint={fingerprint_short}"
+            )
 
         logger.info(
             f"analysis_fingerprint={fingerprint_short} cache_hit=False force_refresh={force_refresh} "

@@ -9,6 +9,7 @@ import type {
   BatchAutoFixRequest,
   BatchAutoFixResponse,
   ChecklistItem,
+  ChecklistFilterItem,
   PaginationMetadata,
   AnalysisMetadata
 } from "./api/types";
@@ -25,6 +26,7 @@ export type {
   BatchAutoFixRequest,
   BatchAutoFixResponse,
   ChecklistItem,
+  ChecklistFilterItem,
   PaginationMetadata,
   AnalysisMetadata
 };
@@ -62,7 +64,11 @@ async function fetchWithTimeout(
   const timeoutId = setTimeout(() => controller.abort(), timeout);
   
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, {
+      cache: options.cache ?? "no-store",
+      ...options,
+      signal: controller.signal
+    });
     clearTimeout(timeoutId);
 
     // Auto-retry on 5xx server errors or 429 rate limits
@@ -176,9 +182,9 @@ export const fetchChecklistCategories = async (): Promise<string[]> => {
   return data.categories || [];
 };
 
-export const fetchChecklistItems = async (category: string): Promise<{ index: number; section: string; checklist_item: string }[]> => {
+export const fetchChecklistItems = async (category: string): Promise<ChecklistFilterItem[]> => {
   const response = await fetchWithTimeout(`${API_BASE_URL}/checklists/${encodeURIComponent(category)}`);
-  const data = await handleResponse<{ items: { index: number; section: string; checklist_item: string }[] }>(response);
+  const data = await handleResponse<{ items: ChecklistFilterItem[] }>(response);
   return data.items || [];
 };
 
